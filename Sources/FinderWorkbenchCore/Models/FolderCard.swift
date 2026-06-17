@@ -20,13 +20,19 @@ public struct FolderCard: Codable, Equatable, Identifiable, Sendable {
     public var folderPath: String
     public var frame: CardFrame
     public var isLocked: Bool
+    public var bookmarkData: Data?
 
-    public init(id: UUID = UUID(), displayName: String, folderPath: String, frame: CardFrame, isLocked: Bool = false) {
+    public init(id: UUID = UUID(), displayName: String, folderPath: String, frame: CardFrame, isLocked: Bool = false, bookmarkData: Data? = nil) {
         self.id = id
         self.displayName = displayName
         self.folderPath = folderPath
         self.frame = frame
         self.isLocked = isLocked
+        self.bookmarkData = bookmarkData
+    }
+
+    public var folderURL: URL {
+        URL(fileURLWithPath: folderPath, isDirectory: true)
     }
 
     public var canMove: Bool { !isLocked }

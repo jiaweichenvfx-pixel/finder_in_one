@@ -126,4 +126,24 @@ extension FolderCardTests {
         XCTAssertEqual(workspace.cards.count, 2)
         XCTAssertEqual(workspace.cards, [updated, other])
     }
+
+    func testFolderCardDefaultsBookmarkDataToNil() {
+        let card = FolderCard(
+            displayName: "Projects",
+            folderPath: "/tmp/Projects",
+            frame: CardFrame(x: 0, y: 0, width: 240, height: 180)
+        )
+
+        XCTAssertNil(card.bookmarkData)
+    }
+
+    func testFolderCardExposesFolderURL() {
+        let card = FolderCard(
+            displayName: "Projects",
+            folderPath: "/tmp/Projects",
+            frame: CardFrame(x: 0, y: 0, width: 240, height: 180)
+        )
+
+        XCTAssertEqual(card.folderURL, URL(fileURLWithPath: "/tmp/Projects", isDirectory: true))
+    }
 }
