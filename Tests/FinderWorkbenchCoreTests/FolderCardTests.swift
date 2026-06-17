@@ -39,4 +39,18 @@ final class FolderCardTests: XCTestCase {
         XCTAssertTrue(card.resize(width: 420, height: 260))
         XCTAssertEqual(card.frame, CardFrame(x: 40, y: 80, width: 420, height: 260))
     }
+
+    func testUnlockedCardResizeClampsToMinimumSize() {
+        var card = FolderCard(
+            id: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!,
+            displayName: "Archive",
+            folderPath: "/Users/test/Archive",
+            frame: CardFrame(x: 0, y: 0, width: 240, height: 180),
+            isLocked: false
+        )
+
+        XCTAssertTrue(card.resize(width: 1, height: 1))
+        XCTAssertEqual(card.frame.width, 180)
+        XCTAssertEqual(card.frame.height, 120)
+    }
 }
