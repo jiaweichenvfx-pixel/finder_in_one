@@ -2,6 +2,21 @@ import XCTest
 @testable import FinderWorkbenchCore
 
 final class FileTransferServiceTests: XCTestCase {
+    func testKeepBothUsesOriginalNameWhenNoConflictExists() {
+        let planner = FileConflictPlanner()
+        let source = URL(fileURLWithPath: "/tmp/Brief.pdf")
+        let targetDirectory = URL(fileURLWithPath: "/tmp/Target", isDirectory: true)
+
+        let planned = planner.destinationURL(
+            for: source,
+            in: targetDirectory,
+            existingNames: ["Notes.pdf"],
+            policy: .keepBoth
+        )
+
+        XCTAssertEqual(planned, targetDirectory.appendingPathComponent("Brief.pdf"))
+    }
+
     func testKeepBothAddsNumericSuffixBeforeExtension() {
         let planner = FileConflictPlanner()
         let source = URL(fileURLWithPath: "/tmp/Brief.pdf")
@@ -15,7 +30,22 @@ final class FileTransferServiceTests: XCTestCase {
             policy: .keepBoth
         )
 
-        XCTAssertEqual(planned?.lastPathComponent, "Brief 3.pdf")
+        XCTAssertEqual(planned, targetDirectory.appendingPathComponent("Brief 3.pdf"))
+    }
+
+    func testKeepBothTreatsExistingNamesCaseInsensitively() {
+        let planner = FileConflictPlanner()
+        let source = URL(fileURLWithPath: "/tmp/Brief.pdf")
+        let targetDirectory = URL(fileURLWithPath: "/tmp/Target", isDirectory: true)
+
+        let planned = planner.destinationURL(
+            for: source,
+            in: targetDirectory,
+            existingNames: ["brief.pdf"],
+            policy: .keepBoth
+        )
+
+        XCTAssertEqual(planned, targetDirectory.appendingPathComponent("Brief 2.pdf"))
     }
 
     func testSkipReturnsNilWhenConflictExists() {
@@ -45,6 +75,6 @@ final class FileTransferServiceTests: XCTestCase {
             policy: .replace
         )
 
-        XCTAssertEqual(planned?.lastPathComponent, "Brief.pdf")
+        XCTAssertEqual(planned, targetDirectory.appendingPathComponent("Brief.pdf"))
     }
 }

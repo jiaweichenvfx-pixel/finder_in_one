@@ -17,8 +17,9 @@ public struct FileConflictPlanner: Sendable {
     ) -> URL? {
         let originalName = sourceURL.lastPathComponent
         let originalDestination = targetDirectory.appendingPathComponent(originalName)
+        let normalizedExistingNames = Set(existingNames.map { normalizedName($0) })
 
-        guard existingNames.contains(originalName) else {
+        guard normalizedExistingNames.contains(normalizedName(originalName)) else {
             return originalDestination
         }
 
@@ -28,11 +29,13 @@ public struct FileConflictPlanner: Sendable {
         case .replace:
             return originalDestination
         case .keepBoth:
-            return targetDirectory.appendingPathComponent(nonConflictingName(for: sourceURL, existingNames: existingNames))
+            return targetDirectory.appendingPathComponent(
+                nonConflictingName(for: sourceURL, normalizedExistingNames: normalizedExistingNames)
+            )
         }
     }
 
-    private func nonConflictingName(for sourceURL: URL, existingNames: Set<String>) -> String {
+    private func nonConflictingName(for sourceURL: URL, normalizedExistingNames: Set<String>) -> String {
         let baseName = sourceURL.deletingPathExtension().lastPathComponent
         let pathExtension = sourceURL.pathExtension
         var counter = 2
@@ -45,10 +48,14 @@ public struct FileConflictPlanner: Sendable {
                 candidate = "\(baseName) \(counter).\(pathExtension)"
             }
 
-            if !existingNames.contains(candidate) {
+            if !normalizedExistingNames.contains(normalizedName(candidate)) {
                 return candidate
             }
             counter += 1
         }
+    }
+
+    private func normalizedName(_ name: String) -> String {
+        name.lowercased()
     }
 }
