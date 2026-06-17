@@ -17,6 +17,10 @@ let package = Package(
         .testTarget(
             name: "FinderWorkbenchCoreTests",
             dependencies: ["FinderWorkbenchCore"]
+        ),
+        .testTarget(
+            name: "FinderInOneTests",
+            dependencies: ["FinderInOne"]
         )
     ]
 )

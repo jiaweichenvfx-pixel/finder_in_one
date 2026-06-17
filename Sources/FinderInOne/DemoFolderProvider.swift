@@ -22,10 +22,26 @@ struct DemoFolderProvider {
     }
 
     private func demoRoot() throws -> URL {
-        let current = URL(fileURLWithPath: fileManager.currentDirectoryPath, isDirectory: true)
-        let root = current.appendingPathComponent(".finder-workbench-demo-folders", isDirectory: true)
+        let root = try packageRoot()
+            .appendingPathComponent(".finder-workbench-demo-folders", isDirectory: true)
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
         return root
+    }
+
+    private func packageRoot(filePath: String = #filePath) throws -> URL {
+        var directory = URL(fileURLWithPath: filePath)
+            .deletingLastPathComponent()
+            .standardizedFileURL
+
+        while directory.path != "/" {
+            let packageFile = directory.appendingPathComponent("Package.swift")
+            if fileManager.fileExists(atPath: packageFile.path) {
+                return directory
+            }
+            directory.deleteLastPathComponent()
+        }
+
+        throw DemoFolderProviderError.packageRootNotFound
     }
 
     private func nextFolderIndex(in root: URL) throws -> Int {
@@ -41,4 +57,8 @@ struct DemoFolderProvider {
         try "Demo note \(index)\n".write(to: folderURL.appendingPathComponent("Note \(index).txt"), atomically: true, encoding: .utf8)
         try fileManager.createDirectory(at: folderURL.appendingPathComponent("Assets", isDirectory: true), withIntermediateDirectories: true)
     }
+}
+
+private enum DemoFolderProviderError: Error {
+    case packageRootNotFound
 }
