@@ -2,19 +2,21 @@ import FinderWorkbenchCore
 import SwiftUI
 
 struct WorkspaceView: View {
-    @State private var workspace = Workspace(cards: WorkspaceView.sampleCards)
-    @State private var transferMode = TransferMode.copy
+    @State private var viewModel = WorkspaceViewModel()
 
     var body: some View {
         VStack(spacing: 0) {
             toolbar
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 10)], spacing: 10) {
-                    ForEach(workspace.cards) { card in
+                    ForEach(viewModel.workspace.cards) { card in
                         FolderCardView(
                             card: card,
-                            onToggleLock: { toggleLock(for: card.id) },
-                            onClose: { closeCard(id: card.id) }
+                            items: viewModel.itemsByCardID[card.id] ?? [],
+                            errorMessage: viewModel.errorsByCardID[card.id],
+                            onToggleLock: { viewModel.toggleLock(for: card.id) },
+                            onOpenInFinder: { viewModel.openInFinder(card: card) },
+                            onClose: { viewModel.closeCard(id: card.id) }
                         )
                             .frame(height: card.frame.height)
                     }
@@ -27,15 +29,17 @@ struct WorkspaceView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
-            Button("+") {}
+            Button("+") {
+                viewModel.addDemoFolder()
+            }
                 .help("Add folder")
-            modeButton("Copy", isSelected: transferMode == .copy) {
-                transferMode = .copy
+            modeButton("Copy", isSelected: viewModel.transferMode == .copy) {
+                viewModel.transferMode = .copy
             }
-            modeButton("Move once", isSelected: transferMode == .moveOnce) {
-                transferMode = .moveOnce
+            modeButton("Move once", isSelected: viewModel.transferMode == .moveOnce) {
+                viewModel.transferMode = .moveOnce
             }
-            Text("\(workspace.cards.count) folders")
+            Text("\(viewModel.workspace.cards.count) folders")
                 .foregroundStyle(.secondary)
             Spacer()
         }
@@ -55,21 +59,4 @@ struct WorkspaceView: View {
         }
     }
 
-    private func toggleLock(for id: UUID) {
-        guard var card = workspace.cards.first(where: { $0.id == id }) else {
-            return
-        }
-        card.isLocked.toggle()
-        workspace.updateCard(card)
-    }
-
-    private func closeCard(id: UUID) {
-        workspace.closeCard(id: id)
-    }
-
-    private static let sampleCards: [FolderCard] = [
-        FolderCard(displayName: "Client A", folderPath: "/Users/test/Client A", frame: CardFrame(x: 0, y: 0, width: 360, height: 260)),
-        FolderCard(displayName: "Projects", folderPath: "/Users/test/Projects", frame: CardFrame(x: 0, y: 0, width: 360, height: 220), isLocked: true),
-        FolderCard(displayName: "Downloads", folderPath: "/Users/test/Downloads", frame: CardFrame(x: 0, y: 0, width: 260, height: 180)),
-    ]
 }
