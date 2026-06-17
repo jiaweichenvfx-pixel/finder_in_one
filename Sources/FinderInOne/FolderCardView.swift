@@ -10,8 +10,10 @@ struct FolderCardView: View {
     let onOpenInFinder: () -> Void
     let onClose: () -> Void
     let onDropFile: (URL) -> Bool
+    let onResize: (Double, Double) -> Void
 
     @State private var isDropTargeted = false
+    @State private var resizeStartFrame: CardFrame?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -29,6 +31,9 @@ struct FolderCardView: View {
                 Spacer(minLength: 0)
             } else {
                 fileRows
+            }
+            if card.canResize {
+                resizeHandle
             }
         }
         .padding(10)
@@ -84,6 +89,31 @@ struct FolderCardView: View {
             }
         }
         .font(.system(size: 12, design: .monospaced))
+    }
+
+    private var resizeHandle: some View {
+        HStack {
+            Spacer()
+            Image(systemName: "arrow.down.right")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 18, height: 18)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 2)
+                        .onChanged { value in
+                            let startFrame = resizeStartFrame ?? card.frame
+                            resizeStartFrame = startFrame
+                            onResize(
+                                startFrame.width + value.translation.width,
+                                startFrame.height + value.translation.height
+                            )
+                        }
+                        .onEnded { _ in
+                            resizeStartFrame = nil
+                        }
+                )
+        }
     }
 
     private var borderColor: Color {

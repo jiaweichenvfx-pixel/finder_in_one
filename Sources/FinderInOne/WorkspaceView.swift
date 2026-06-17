@@ -10,31 +10,42 @@ struct WorkspaceView: View {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 10)], spacing: 10) {
                     ForEach(viewModel.workspace.cards) { card in
-                        FolderCardView(
-                            card: card,
-                            items: viewModel.itemsByCardID[card.id] ?? [],
-                            errorMessage: viewModel.errorsByCardID[card.id],
-                            onToggleLock: { viewModel.toggleLock(for: card.id) },
-                            onOpenInFinder: { viewModel.openInFinder(card: card) },
-                            onClose: { viewModel.closeCard(id: card.id) },
-                            onDropFile: { url in
-                                let item = FileItem(
-                                    url: url,
-                                    name: url.lastPathComponent,
-                                    modifiedAt: nil,
-                                    byteSize: nil,
-                                    isDirectory: false
-                                )
-                                return viewModel.transfer(item: item, to: card)
-                            }
-                        )
-                            .frame(height: card.frame.height)
+                        cardView(for: card)
                     }
                 }
                 .padding(10)
             }
         }
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private func cardView(for card: FolderCard) -> some View {
+        FolderCardView(
+            card: card,
+            items: viewModel.itemsByCardID[card.id] ?? [],
+            errorMessage: viewModel.errorsByCardID[card.id],
+            onToggleLock: { viewModel.toggleLock(for: card.id) },
+            onOpenInFinder: { viewModel.openInFinder(card: card) },
+            onClose: { viewModel.closeCard(id: card.id) },
+            onDropFile: { url in
+                viewModel.transfer(item: fileItem(for: url), to: card)
+            },
+            onResize: { width, height in
+                viewModel.resizeCard(id: card.id, width: width, height: height)
+            }
+        )
+        .frame(minWidth: 260, idealWidth: card.frame.width)
+        .frame(height: card.frame.height)
+    }
+
+    private func fileItem(for url: URL) -> FileItem {
+        FileItem(
+            url: url,
+            name: url.lastPathComponent,
+            modifiedAt: nil,
+            byteSize: nil,
+            isDirectory: false
+        )
     }
 
     private var toolbar: some View {

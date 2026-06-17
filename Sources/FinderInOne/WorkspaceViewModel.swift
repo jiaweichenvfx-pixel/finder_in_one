@@ -66,6 +66,19 @@ final class WorkspaceViewModel {
         save()
     }
 
+    @discardableResult
+    func resizeCard(id: UUID, width: Double, height: Double) -> Bool {
+        guard var card = workspace.cards.first(where: { $0.id == id }) else {
+            return false
+        }
+        guard card.resize(width: width, height: height) else {
+            return false
+        }
+        workspace.updateCard(card)
+        save()
+        return true
+    }
+
     func openInFinder(card: FolderCard) {
         finderOpening.openInFinder(card.folderURL)
     }
