@@ -54,3 +54,31 @@ final class FolderCardTests: XCTestCase {
         XCTAssertEqual(card.frame.height, 120)
     }
 }
+
+extension FolderCardTests {
+    func testWorkspaceClosesOnlyUnlockedCards() {
+        let lockedID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+        let unlockedID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+        var workspace = Workspace(cards: [
+            FolderCard(id: lockedID, displayName: "Locked", folderPath: "/tmp/locked", frame: CardFrame(x: 0, y: 0, width: 200, height: 160), isLocked: true),
+            FolderCard(id: unlockedID, displayName: "Unlocked", folderPath: "/tmp/unlocked", frame: CardFrame(x: 10, y: 10, width: 200, height: 160), isLocked: false)
+        ])
+
+        XCTAssertFalse(workspace.closeCard(id: lockedID))
+        XCTAssertTrue(workspace.closeCard(id: unlockedID))
+        XCTAssertEqual(workspace.cards.map(\.id), [lockedID])
+    }
+
+    func testWorkspaceAllowsMoreThanSixCards() {
+        var workspace = Workspace()
+        for index in 0..<8 {
+            workspace.addCard(FolderCard(
+                displayName: "Folder \(index)",
+                folderPath: "/tmp/folder-\(index)",
+                frame: CardFrame(x: Double(index * 20), y: 0, width: 220, height: 160)
+            ))
+        }
+
+        XCTAssertEqual(workspace.cards.count, 8)
+    }
+}
