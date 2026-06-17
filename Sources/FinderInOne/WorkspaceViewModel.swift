@@ -48,6 +48,27 @@ final class WorkspaceViewModel {
         save()
     }
 
+    @discardableResult
+    func addFolder(url: URL) -> FolderCard? {
+        let card = FolderCard(
+            displayName: url.lastPathComponent,
+            folderPath: url.path,
+            frame: CardFrame(x: 0, y: 0, width: 360, height: 240),
+            bookmarkData: bookmarkData(for: url)
+        )
+        workspace.addCard(card)
+        refresh(card: card)
+        save()
+        return card
+    }
+
+    func pickAndAddFolder() async {
+        guard let url = await FolderPicking().pickFolder() else {
+            return
+        }
+        addFolder(url: url)
+    }
+
     func toggleLock(for id: UUID) {
         guard var card = workspace.cards.first(where: { $0.id == id }) else {
             return
@@ -104,13 +125,14 @@ final class WorkspaceViewModel {
             }
         }
 
-        guard let transferRoot = resolvedAllowedTransferRoot() else {
+        let transferRoots = resolvedAllowedTransferRoots()
+        guard !transferRoots.isEmpty else {
             errorsByCardID[targetCard.id] = "Transfer root unavailable"
             return false
         }
 
         do {
-            _ = try ScopedFileTransferService(allowedRoot: transferRoot).transfer(
+            _ = try ScopedFileTransferService(allowedRoots: transferRoots).transfer(
                 sourceURL: item.url,
                 targetDirectory: targetCard.folderURL,
                 operation: operation,
@@ -145,6 +167,14 @@ final class WorkspaceViewModel {
         try? store.save(workspace)
     }
 
+    private func bookmarkData(for url: URL) -> Data? {
+        try? url.bookmarkData(
+            options: .withSecurityScope,
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        )
+    }
+
     private var currentTransferOperation: FileTransferOperation {
         switch transferMode {
         case .copy:
@@ -154,11 +184,11 @@ final class WorkspaceViewModel {
         }
     }
 
-    private func resolvedAllowedTransferRoot() -> URL? {
+    private func resolvedAllowedTransferRoots() -> [URL] {
         if let allowedTransferRoot {
-            return allowedTransferRoot
+            return [allowedTransferRoot]
         }
-        return try? demoFolderProvider.demoRootURL()
+        return workspace.cards.map(\.folderURL)
     }
 
     private func refreshImpactedCards(for item: FileItem, targetCard: FolderCard) {

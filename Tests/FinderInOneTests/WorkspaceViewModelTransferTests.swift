@@ -46,6 +46,22 @@ final class WorkspaceViewModelTransferTests: XCTestCase {
         XCTAssertEqual(viewModel.itemsByCardID[fixture.targetCard.id]?.map(\.name), ["Render.exr"])
         XCTAssertEqual(viewModel.transferMode, .copy)
     }
+
+    func testTransferBetweenWorkspaceCardRootsWithoutInjectedAllowedRoot() throws {
+        let fixture = try WorkspaceViewModelTransferFixture()
+        defer { fixture.cleanUp() }
+        try fixture.createSourceFile(named: "Texture.tx", contents: "texture")
+        try fixture.saveWorkspace()
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+        let item = try XCTUnwrap(viewModel.itemsByCardID[fixture.sourceCard.id]?.first)
+
+        let transferred = viewModel.transfer(item: item, to: fixture.targetCard)
+
+        XCTAssertTrue(transferred)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.sourceDirectory.appendingPathComponent("Texture.tx").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.targetDirectory.appendingPathComponent("Texture.tx").path))
+        XCTAssertEqual(viewModel.itemsByCardID[fixture.targetCard.id]?.map(\.name), ["Texture.tx"])
+    }
 }
 
 private struct WorkspaceViewModelTransferFixture {

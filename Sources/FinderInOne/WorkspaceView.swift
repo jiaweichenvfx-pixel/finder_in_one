@@ -68,7 +68,9 @@ struct WorkspaceView: View {
             }
             .help("Refresh folders")
             Button {
-                viewModel.addDemoFolder()
+                Task {
+                    await viewModel.pickAndAddFolder()
+                }
             } label: {
                 Image(systemName: "plus")
             }

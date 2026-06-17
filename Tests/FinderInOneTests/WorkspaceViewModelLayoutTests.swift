@@ -59,6 +59,22 @@ final class WorkspaceViewModelLayoutTests: XCTestCase {
         XCTAssertEqual(viewModel.workspace.cards.map(\.id), [fixture.card.id, secondCard.id])
         XCTAssertEqual(try fixture.store.load().cards.map(\.id), [fixture.card.id, secondCard.id])
     }
+
+    func testAddFolderURLCreatesCardRefreshesAndPersists() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
+        defer { fixture.cleanUp() }
+        let externalFolder = try fixture.createFolder(named: "External")
+        try "hello".write(to: externalFolder.appendingPathComponent("note.txt"), atomically: true, encoding: .utf8)
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+
+        let added = viewModel.addFolder(url: externalFolder)
+
+        let card = try XCTUnwrap(added)
+        XCTAssertEqual(card.displayName, "External")
+        XCTAssertEqual(card.folderPath, externalFolder.path)
+        XCTAssertEqual(viewModel.itemsByCardID[card.id]?.map(\.name), ["note.txt"])
+        XCTAssertEqual(try fixture.store.load().cards.map(\.folderPath), [externalFolder.path])
+    }
 }
 
 private struct WorkspaceViewModelLayoutFixture {
@@ -94,6 +110,12 @@ private struct WorkspaceViewModelLayoutFixture {
             frame: CardFrame(x: 0, y: 0, width: 360, height: 240),
             isLocked: isLocked
         )
+    }
+
+    func createFolder(named name: String) throws -> URL {
+        let url = root.appendingPathComponent(name, isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
     }
 
     func cleanUp() {

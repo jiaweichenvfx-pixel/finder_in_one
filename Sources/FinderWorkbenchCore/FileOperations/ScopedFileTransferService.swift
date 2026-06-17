@@ -6,11 +6,16 @@ public enum ScopedFileTransferError: Error, Equatable, Sendable {
 }
 
 public struct ScopedFileTransferService {
-    private let allowedRoot: URL
+    private let allowedRoots: [URL]
     private let transferService: FileTransferService
 
     public init(allowedRoot: URL, transferService: FileTransferService = FileTransferService()) {
-        self.allowedRoot = allowedRoot
+        self.allowedRoots = [allowedRoot]
+        self.transferService = transferService
+    }
+
+    public init(allowedRoots: [URL], transferService: FileTransferService = FileTransferService()) {
+        self.allowedRoots = allowedRoots
         self.transferService = transferService
     }
 
@@ -36,9 +41,11 @@ public struct ScopedFileTransferService {
     }
 
     private func contains(_ url: URL) -> Bool {
-        let rootPath = canonicalPath(for: allowedRoot)
         let candidatePath = canonicalPath(for: url)
-        return candidatePath == rootPath || candidatePath.hasPrefix(rootPath + "/")
+        return allowedRoots.contains { root in
+            let rootPath = canonicalPath(for: root)
+            return candidatePath == rootPath || candidatePath.hasPrefix(rootPath + "/")
+        }
     }
 
     private func canonicalPath(for url: URL) -> String {
