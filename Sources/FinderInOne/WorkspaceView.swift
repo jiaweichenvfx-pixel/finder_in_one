@@ -52,19 +52,27 @@ struct WorkspaceView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
-            Button("+") {
-                viewModel.addDemoFolder()
-            }
-                .help("Add folder")
+            Text("\(viewModel.workspace.cards.count) folders")
+                .foregroundStyle(.secondary)
+            Spacer()
             modeButton("Copy", isSelected: viewModel.transferMode == .copy) {
                 viewModel.transferMode = .copy
             }
             modeButton("Move once", isSelected: viewModel.transferMode == .moveOnce) {
                 viewModel.transferMode = .moveOnce
             }
-            Text("\(viewModel.workspace.cards.count) folders")
-                .foregroundStyle(.secondary)
-            Spacer()
+            Button {
+                viewModel.refreshAllCards()
+            } label: {
+                Image(systemName: "arrow.clockwise")
+            }
+            .help("Refresh folders")
+            Button {
+                viewModel.addDemoFolder()
+            } label: {
+                Image(systemName: "plus")
+            }
+            .help("Add folder")
         }
         .font(.system(size: 12))
         .padding(.horizontal, 10)
