@@ -11,7 +11,11 @@ struct WorkspaceView: View {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 10)], spacing: 10) {
                     ForEach(workspace.cards) { card in
-                        FolderCardView(card: card)
+                        FolderCardView(
+                            card: card,
+                            onToggleLock: { toggleLock(for: card.id) },
+                            onClose: { closeCard(id: card.id) }
+                        )
                             .frame(height: card.frame.height)
                     }
                 }
@@ -25,23 +29,42 @@ struct WorkspaceView: View {
         HStack(spacing: 8) {
             Button("+") {}
                 .help("Add folder")
-            Button("Copy") {
+            modeButton("Copy", isSelected: transferMode == .copy) {
                 transferMode = .copy
             }
-            .buttonStyle(.borderedProminent)
-            Button("Move once") {
+            modeButton("Move once", isSelected: transferMode == .moveOnce) {
                 transferMode = .moveOnce
             }
             Text("\(workspace.cards.count) folders")
                 .foregroundStyle(.secondary)
             Spacer()
-            TextField("Search", text: .constant(""))
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 160)
         }
         .font(.system(size: 12))
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
+    }
+
+    @ViewBuilder
+    private func modeButton(_ title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        if isSelected {
+            Button(title, action: action)
+                .buttonStyle(.borderedProminent)
+        } else {
+            Button(title, action: action)
+                .buttonStyle(.bordered)
+        }
+    }
+
+    private func toggleLock(for id: UUID) {
+        guard var card = workspace.cards.first(where: { $0.id == id }) else {
+            return
+        }
+        card.isLocked.toggle()
+        workspace.updateCard(card)
+    }
+
+    private func closeCard(id: UUID) {
+        workspace.closeCard(id: id)
     }
 
     private static let sampleCards: [FolderCard] = [

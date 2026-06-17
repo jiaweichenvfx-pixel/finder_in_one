@@ -1,4 +1,3 @@
-import FinderWorkbenchCore
 import SwiftUI
 
 @main

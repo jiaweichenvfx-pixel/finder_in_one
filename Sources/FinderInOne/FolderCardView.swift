@@ -3,6 +3,8 @@ import SwiftUI
 
 struct FolderCardView: View {
     let card: FolderCard
+    let onToggleLock: () -> Void
+    let onClose: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -17,10 +19,12 @@ struct FolderCardView: View {
                 }
                 Spacer()
                 HStack(spacing: 4) {
-                    Button(card.isLocked ? "Unlock" : "Lock") {}
+                    Button(card.isLocked ? "Unlock" : "Lock", action: onToggleLock)
                     Button("Finder") {}
+                        .disabled(true)
+                        .help("Open in Finder will be wired in the next slice")
                     if card.canClose {
-                        Button("Close") {}
+                        Button("Close", action: onClose)
                     }
                 }
                 .font(.system(size: 11))
