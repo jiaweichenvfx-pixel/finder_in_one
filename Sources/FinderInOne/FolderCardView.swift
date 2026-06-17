@@ -81,24 +81,27 @@ struct FolderCardView: View {
     }
 
     private var fileRows: some View {
-        Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
-            GridRow {
-                Text("Name").bold()
-                Text("Modified").bold()
-                Text("Size").bold()
-                Text("Kind").bold()
-            }
-            ForEach(items.prefix(20)) { item in
+        ScrollView {
+            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
                 GridRow {
-                    Text(item.name).lineLimit(1)
-                    Text(Self.dateFormatter.string(from: item.modifiedAt ?? .distantPast))
-                    Text(item.byteSize.map(Self.byteFormatter.string(fromByteCount:)) ?? "--")
-                    Text(item.kind)
+                    Text("Name").bold()
+                    Text("Modified").bold()
+                    Text("Size").bold()
+                    Text("Kind").bold()
                 }
-                .onDrag {
-                    NSItemProvider(object: item.url as NSURL)
+                ForEach(items.prefix(100)) { item in
+                    GridRow {
+                        Text(item.name).lineLimit(1)
+                        Text(Self.dateFormatter.string(from: item.modifiedAt ?? .distantPast))
+                        Text(item.byteSize.map(Self.byteFormatter.string(fromByteCount:)) ?? "--")
+                        Text(item.kind)
+                    }
+                    .onDrag {
+                        NSItemProvider(object: item.url as NSURL)
+                    }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .font(.system(size: 12, design: .monospaced))
     }
