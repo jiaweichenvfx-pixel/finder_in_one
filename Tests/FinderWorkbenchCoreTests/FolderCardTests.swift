@@ -81,4 +81,49 @@ extension FolderCardTests {
 
         XCTAssertEqual(workspace.cards.count, 8)
     }
+
+    func testWorkspaceCloseCardReturnsFalseForUnknownIDAndLeavesCardsUnchanged() {
+        let cardID = UUID(uuidString: "55555555-5555-5555-5555-555555555555")!
+        let unknownID = UUID(uuidString: "66666666-6666-6666-6666-666666666666")!
+        let card = FolderCard(
+            id: cardID,
+            displayName: "Projects",
+            folderPath: "/tmp/projects",
+            frame: CardFrame(x: 0, y: 0, width: 220, height: 160)
+        )
+        var workspace = Workspace(cards: [card])
+
+        XCTAssertFalse(workspace.closeCard(id: unknownID))
+        XCTAssertEqual(workspace.cards, [card])
+    }
+
+    func testWorkspaceUpdateReplacesMatchingCardWithoutAppending() {
+        let cardID = UUID(uuidString: "77777777-7777-7777-7777-777777777777")!
+        let otherID = UUID(uuidString: "88888888-8888-8888-8888-888888888888")!
+        let original = FolderCard(
+            id: cardID,
+            displayName: "Before",
+            folderPath: "/tmp/before",
+            frame: CardFrame(x: 0, y: 0, width: 220, height: 160)
+        )
+        let other = FolderCard(
+            id: otherID,
+            displayName: "Other",
+            folderPath: "/tmp/other",
+            frame: CardFrame(x: 10, y: 10, width: 220, height: 160)
+        )
+        let updated = FolderCard(
+            id: cardID,
+            displayName: "After",
+            folderPath: "/tmp/after",
+            frame: CardFrame(x: 20, y: 20, width: 260, height: 180),
+            isLocked: true
+        )
+        var workspace = Workspace(cards: [original, other])
+
+        workspace.updateCard(updated)
+
+        XCTAssertEqual(workspace.cards.count, 2)
+        XCTAssertEqual(workspace.cards, [updated, other])
+    }
 }
