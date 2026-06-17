@@ -2,4 +2,5 @@
 .worktrees/
 .build/
 .finder-workbench-demo-folders/
+.finder-workbench-demo-folders-test/
 .DS_Store
