@@ -7,12 +7,13 @@ struct WorkspaceView: View {
     var body: some View {
         VStack(spacing: 0) {
             toolbar
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 10)], spacing: 10) {
+            ScrollView([.horizontal, .vertical]) {
+                ZStack(alignment: .topLeading) {
                     ForEach(viewModel.workspace.cards) { card in
                         cardView(for: card)
                     }
                 }
+                .frame(width: canvasSize.width, height: canvasSize.height, alignment: .topLeading)
                 .padding(10)
             }
         }
@@ -32,12 +33,18 @@ struct WorkspaceView: View {
             onDropFile: { url in
                 viewModel.transfer(item: fileItem(for: url), to: card)
             },
+            onOpenItem: { item in
+                viewModel.open(item: item, in: card)
+            },
+            onMoveTo: { x, y in
+                viewModel.moveCard(id: card.id, x: x, y: y)
+            },
             onResize: { width, height in
                 viewModel.resizeCard(id: card.id, width: width, height: height)
             }
         )
-        .frame(minWidth: 260, idealWidth: card.frame.width)
-        .frame(height: card.frame.height)
+        .frame(width: card.frame.width, height: card.frame.height)
+        .position(x: card.frame.x + card.frame.width / 2, y: card.frame.y + card.frame.height / 2)
     }
 
     private func fileItem(for url: URL) -> FileItem {
@@ -79,6 +86,12 @@ struct WorkspaceView: View {
         .font(.system(size: 12))
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
+    }
+
+    private var canvasSize: CGSize {
+        let rightEdge = viewModel.workspace.cards.map { $0.frame.x + $0.frame.width }.max() ?? 900
+        let bottomEdge = viewModel.workspace.cards.map { $0.frame.y + $0.frame.height }.max() ?? 600
+        return CGSize(width: max(900, rightEdge + 40), height: max(600, bottomEdge + 40))
     }
 
     @ViewBuilder

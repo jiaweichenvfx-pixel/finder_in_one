@@ -60,6 +60,34 @@ final class WorkspaceViewModelLayoutTests: XCTestCase {
         XCTAssertEqual(try fixture.store.load().cards.map(\.id), [fixture.card.id, secondCard.id])
     }
 
+    func testMoveUnlockedCardToPositionPersistsFrame() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
+        defer { fixture.cleanUp() }
+        try fixture.saveWorkspace()
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+
+        let moved = viewModel.moveCard(id: fixture.card.id, x: 120, y: 80)
+
+        XCTAssertTrue(moved)
+        XCTAssertEqual(viewModel.workspace.cards.first?.frame.x, 120)
+        XCTAssertEqual(viewModel.workspace.cards.first?.frame.y, 80)
+        XCTAssertEqual(try fixture.store.load().cards.first?.frame.x, 120)
+        XCTAssertEqual(try fixture.store.load().cards.first?.frame.y, 80)
+    }
+
+    func testMoveLockedCardToPositionReturnsFalseAndKeepsFrame() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: true)
+        defer { fixture.cleanUp() }
+        try fixture.saveWorkspace()
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+
+        let moved = viewModel.moveCard(id: fixture.card.id, x: 120, y: 80)
+
+        XCTAssertFalse(moved)
+        XCTAssertEqual(viewModel.workspace.cards.first?.frame, fixture.card.frame)
+        XCTAssertEqual(try fixture.store.load().cards.first?.frame, fixture.card.frame)
+    }
+
     func testAddFolderURLCreatesCardRefreshesAndPersists() throws {
         let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
         defer { fixture.cleanUp() }

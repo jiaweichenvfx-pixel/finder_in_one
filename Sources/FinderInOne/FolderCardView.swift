@@ -12,9 +12,12 @@ struct FolderCardView: View {
     let onMoveEarlier: () -> Void
     let onMoveLater: () -> Void
     let onDropFile: (URL) -> Bool
+    let onOpenItem: (FileItem) -> Void
+    let onMoveTo: (Double, Double) -> Void
     let onResize: (Double, Double) -> Void
 
     @State private var isDropTargeted = false
+    @State private var moveStartFrame: CardFrame?
     @State private var resizeStartFrame: CardFrame?
 
     var body: some View {
@@ -61,6 +64,13 @@ struct FolderCardView: View {
             Spacer()
             HStack(spacing: 4) {
                 if card.canMove {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 18, height: 18)
+                        .contentShape(Rectangle())
+                        .gesture(moveGesture)
+                        .help("Drag card")
                     Button(action: onMoveEarlier) {
                         Image(systemName: "chevron.left")
                     }
@@ -99,11 +109,29 @@ struct FolderCardView: View {
                     .onDrag {
                         NSItemProvider(object: item.url as NSURL)
                     }
+                    .onTapGesture(count: 2) {
+                        onOpenItem(item)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .font(.system(size: 12, design: .monospaced))
+    }
+
+    private var moveGesture: some Gesture {
+        DragGesture(minimumDistance: 2)
+            .onChanged { value in
+                let startFrame = moveStartFrame ?? card.frame
+                moveStartFrame = startFrame
+                onMoveTo(
+                    startFrame.x + value.translation.width,
+                    startFrame.y + value.translation.height
+                )
+            }
+            .onEnded { _ in
+                moveStartFrame = nil
+            }
     }
 
     private var resizeHandle: some View {

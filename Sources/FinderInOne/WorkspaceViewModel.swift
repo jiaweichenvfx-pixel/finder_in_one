@@ -2,6 +2,12 @@ import FinderWorkbenchCore
 import Foundation
 import Observation
 
+enum WorkspaceItemOpenResult: Equatable {
+    case navigated
+    case openedExternally
+    case failed
+}
+
 @MainActor
 @Observable
 final class WorkspaceViewModel {
@@ -14,6 +20,7 @@ final class WorkspaceViewModel {
     private let listingService: DirectoryListingService
     private let demoFolderProvider: DemoFolderProvider
     private let finderOpening: FinderOpening
+    private let fileOpening: FileOpening
     private let allowedTransferRoot: URL?
 
     init(
@@ -21,12 +28,14 @@ final class WorkspaceViewModel {
         listingService: DirectoryListingService = DirectoryListingService(),
         demoFolderProvider: DemoFolderProvider = DemoFolderProvider(),
         finderOpening: FinderOpening = FinderOpening(),
+        fileOpening: FileOpening = FileOpening(),
         allowedTransferRoot: URL? = nil
     ) {
         self.store = store
         self.listingService = listingService
         self.demoFolderProvider = demoFolderProvider
         self.finderOpening = finderOpening
+        self.fileOpening = fileOpening
         self.allowedTransferRoot = allowedTransferRoot
         self.workspace = (try? store.load()) ?? Workspace()
         refreshAllCards()
@@ -40,7 +49,7 @@ final class WorkspaceViewModel {
         let card = FolderCard(
             displayName: demoFolder.url.lastPathComponent,
             folderPath: demoFolder.url.path,
-            frame: CardFrame(x: 0, y: 0, width: 360, height: 240),
+            frame: frameForNewCard(),
             bookmarkData: demoFolder.bookmarkData
         )
         workspace.addCard(card)
@@ -53,7 +62,7 @@ final class WorkspaceViewModel {
         let card = FolderCard(
             displayName: url.lastPathComponent,
             folderPath: url.path,
-            frame: CardFrame(x: 0, y: 0, width: 360, height: 240),
+            frame: frameForNewCard(),
             bookmarkData: bookmarkData(for: url)
         )
         workspace.addCard(card)
@@ -112,8 +121,38 @@ final class WorkspaceViewModel {
         return true
     }
 
+    @discardableResult
+    func moveCard(id: UUID, x: Double, y: Double) -> Bool {
+        guard var card = workspace.cards.first(where: { $0.id == id }) else {
+            return false
+        }
+        guard card.move(toX: x, y: y) else {
+            return false
+        }
+        workspace.updateCard(card)
+        save()
+        return true
+    }
+
     func openInFinder(card: FolderCard) {
         finderOpening.openInFinder(card.folderURL)
+    }
+
+    @discardableResult
+    func open(item: FileItem, in card: FolderCard) -> WorkspaceItemOpenResult {
+        guard item.isDirectory else {
+            fileOpening.open(item.url)
+            return .openedExternally
+        }
+        guard var currentCard = workspace.cards.first(where: { $0.id == card.id }) else {
+            return .failed
+        }
+        currentCard.folderPath = item.url.path
+        currentCard.displayName = item.name
+        workspace.updateCard(currentCard)
+        refresh(card: currentCard)
+        save()
+        return .navigated
     }
 
     @discardableResult
@@ -172,6 +211,18 @@ final class WorkspaceViewModel {
             options: .withSecurityScope,
             includingResourceValuesForKeys: nil,
             relativeTo: nil
+        )
+    }
+
+    private func frameForNewCard() -> CardFrame {
+        let index = workspace.cards.count
+        let column = index % 3
+        let row = index / 3
+        return CardFrame(
+            x: Double(20 + column * 390),
+            y: Double(20 + row * 280),
+            width: 360,
+            height: 240
         )
     }
 
