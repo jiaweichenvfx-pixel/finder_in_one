@@ -127,6 +127,35 @@ extension FolderCardTests {
         XCTAssertEqual(workspace.cards, [updated, other])
     }
 
+    func testWorkspaceMovesOnlyUnlockedCards() {
+        let first = FolderCard(
+            id: UUID(uuidString: "99999999-9999-9999-9999-999999999999")!,
+            displayName: "First",
+            folderPath: "/tmp/first",
+            frame: CardFrame(x: 0, y: 0, width: 220, height: 160)
+        )
+        let locked = FolderCard(
+            id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
+            displayName: "Locked",
+            folderPath: "/tmp/locked",
+            frame: CardFrame(x: 0, y: 0, width: 220, height: 160),
+            isLocked: true
+        )
+        let last = FolderCard(
+            id: UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!,
+            displayName: "Last",
+            folderPath: "/tmp/last",
+            frame: CardFrame(x: 0, y: 0, width: 220, height: 160)
+        )
+        var workspace = Workspace(cards: [first, locked, last])
+
+        XCTAssertFalse(workspace.moveCard(id: locked.id, toIndex: 0))
+        XCTAssertEqual(workspace.cards.map(\.id), [first.id, locked.id, last.id])
+
+        XCTAssertTrue(workspace.moveCard(id: last.id, toIndex: 0))
+        XCTAssertEqual(workspace.cards.map(\.id), [last.id, first.id, locked.id])
+    }
+
     func testFolderCardDefaultsBookmarkDataToNil() {
         let card = FolderCard(
             displayName: "Projects",

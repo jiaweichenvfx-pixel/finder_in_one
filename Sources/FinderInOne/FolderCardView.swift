@@ -9,6 +9,8 @@ struct FolderCardView: View {
     let onToggleLock: () -> Void
     let onOpenInFinder: () -> Void
     let onClose: () -> Void
+    let onMoveEarlier: () -> Void
+    let onMoveLater: () -> Void
     let onDropFile: (URL) -> Bool
     let onResize: (Double, Double) -> Void
 
@@ -58,6 +60,16 @@ struct FolderCardView: View {
             }
             Spacer()
             HStack(spacing: 4) {
+                if card.canMove {
+                    Button(action: onMoveEarlier) {
+                        Image(systemName: "chevron.left")
+                    }
+                    .help("Move earlier")
+                    Button(action: onMoveLater) {
+                        Image(systemName: "chevron.right")
+                    }
+                    .help("Move later")
+                }
                 Button(card.isLocked ? "Unlock" : "Lock", action: onToggleLock)
                 Button("Finder", action: onOpenInFinder)
                 if card.canClose {

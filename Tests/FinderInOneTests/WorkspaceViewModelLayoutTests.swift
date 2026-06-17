@@ -31,6 +31,34 @@ final class WorkspaceViewModelLayoutTests: XCTestCase {
         XCTAssertEqual(viewModel.workspace.cards.first?.frame, fixture.card.frame)
         XCTAssertEqual(try fixture.store.load().cards.first?.frame, fixture.card.frame)
     }
+
+    func testMoveUnlockedCardLaterPersistsOrder() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
+        defer { fixture.cleanUp() }
+        let secondCard = fixture.makeCard(displayName: "Second", isLocked: false)
+        try fixture.store.save(Workspace(cards: [fixture.card, secondCard]))
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+
+        let moved = viewModel.moveCard(id: fixture.card.id, offset: 1)
+
+        XCTAssertTrue(moved)
+        XCTAssertEqual(viewModel.workspace.cards.map(\.id), [secondCard.id, fixture.card.id])
+        XCTAssertEqual(try fixture.store.load().cards.map(\.id), [secondCard.id, fixture.card.id])
+    }
+
+    func testMoveLockedCardReturnsFalseAndKeepsOrder() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: true)
+        defer { fixture.cleanUp() }
+        let secondCard = fixture.makeCard(displayName: "Second", isLocked: false)
+        try fixture.store.save(Workspace(cards: [fixture.card, secondCard]))
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+
+        let moved = viewModel.moveCard(id: fixture.card.id, offset: 1)
+
+        XCTAssertFalse(moved)
+        XCTAssertEqual(viewModel.workspace.cards.map(\.id), [fixture.card.id, secondCard.id])
+        XCTAssertEqual(try fixture.store.load().cards.map(\.id), [fixture.card.id, secondCard.id])
+    }
 }
 
 private struct WorkspaceViewModelLayoutFixture {
@@ -57,6 +85,15 @@ private struct WorkspaceViewModelLayoutFixture {
 
     func saveWorkspace() throws {
         try store.save(Workspace(cards: [card]))
+    }
+
+    func makeCard(displayName: String, isLocked: Bool) -> FolderCard {
+        FolderCard(
+            displayName: displayName,
+            folderPath: root.appendingPathComponent(displayName, isDirectory: true).path,
+            frame: CardFrame(x: 0, y: 0, width: 360, height: 240),
+            isLocked: isLocked
+        )
     }
 
     func cleanUp() {

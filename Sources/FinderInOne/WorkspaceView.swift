@@ -27,6 +27,8 @@ struct WorkspaceView: View {
             onToggleLock: { viewModel.toggleLock(for: card.id) },
             onOpenInFinder: { viewModel.openInFinder(card: card) },
             onClose: { viewModel.closeCard(id: card.id) },
+            onMoveEarlier: { viewModel.moveCard(id: card.id, offset: -1) },
+            onMoveLater: { viewModel.moveCard(id: card.id, offset: 1) },
             onDropFile: { url in
                 viewModel.transfer(item: fileItem(for: url), to: card)
             },

@@ -29,4 +29,19 @@ public struct Workspace: Codable, Equatable, Sendable {
         }
         cards[index] = card
     }
+
+    @discardableResult
+    public mutating func moveCard(id: UUID, toIndex proposedIndex: Int) -> Bool {
+        guard let currentIndex = cards.firstIndex(where: { $0.id == id }) else {
+            return false
+        }
+        guard cards[currentIndex].canMove else {
+            return false
+        }
+
+        let card = cards.remove(at: currentIndex)
+        let targetIndex = min(max(0, proposedIndex), cards.count)
+        cards.insert(card, at: targetIndex)
+        return true
+    }
 }

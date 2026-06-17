@@ -79,6 +79,18 @@ final class WorkspaceViewModel {
         return true
     }
 
+    @discardableResult
+    func moveCard(id: UUID, offset: Int) -> Bool {
+        guard let currentIndex = workspace.cards.firstIndex(where: { $0.id == id }) else {
+            return false
+        }
+        guard workspace.moveCard(id: id, toIndex: currentIndex + offset) else {
+            return false
+        }
+        save()
+        return true
+    }
+
     func openInFinder(card: FolderCard) {
         finderOpening.openInFinder(card.folderURL)
     }
