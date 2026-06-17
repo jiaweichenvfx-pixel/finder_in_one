@@ -13,7 +13,7 @@ struct DemoFolderProvider {
     }
 
     func createDemoFolder() throws -> DemoFolder {
-        let root = try demoRoot()
+        let root = try demoRootURL()
         let index = try nextFolderIndex(in: root)
         let folderURL = root.appendingPathComponent("Demo Folder \(index)", isDirectory: true)
         try fileManager.createDirectory(at: folderURL, withIntermediateDirectories: true)
@@ -21,7 +21,7 @@ struct DemoFolderProvider {
         return DemoFolder(url: folderURL, bookmarkData: nil)
     }
 
-    private func demoRoot() throws -> URL {
+    func demoRootURL() throws -> URL {
         let root = try packageRoot()
             .appendingPathComponent(".finder-workbench-demo-folders", isDirectory: true)
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)

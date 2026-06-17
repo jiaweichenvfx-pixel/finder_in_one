@@ -16,7 +16,17 @@ struct WorkspaceView: View {
                             errorMessage: viewModel.errorsByCardID[card.id],
                             onToggleLock: { viewModel.toggleLock(for: card.id) },
                             onOpenInFinder: { viewModel.openInFinder(card: card) },
-                            onClose: { viewModel.closeCard(id: card.id) }
+                            onClose: { viewModel.closeCard(id: card.id) },
+                            onDropFile: { url in
+                                let item = FileItem(
+                                    url: url,
+                                    name: url.lastPathComponent,
+                                    modifiedAt: nil,
+                                    byteSize: nil,
+                                    isDirectory: false
+                                )
+                                return viewModel.transfer(item: item, to: card)
+                            }
                         )
                             .frame(height: card.frame.height)
                     }
