@@ -39,6 +39,10 @@ public struct FileTransferService {
             return .skipped
         }
 
+        if sourceURL.resolvingSymlinksInPath().standardizedFileURL.path == destinationURL.resolvingSymlinksInPath().standardizedFileURL.path {
+            return .transferred(destinationURL: destinationURL)
+        }
+
         if fileManager.fileExists(atPath: destinationURL.path), conflictPolicy == .replace {
             try fileManager.removeItem(at: destinationURL)
         }

@@ -80,6 +80,24 @@ final class FileTransferServiceTests: XCTestCase {
 }
 
 extension FileTransferServiceTests {
+    func testCopyFileToSameDirectoryWithReplaceIsNoOp() throws {
+        let fixture = try FileTransferFixture()
+        defer { fixture.cleanUp() }
+        let sourceFile = try fixture.createSourceFile(named: "SamePlace.txt", contents: "keep me")
+        let service = FileTransferService()
+
+        let result = try service.transfer(
+            sourceURL: sourceFile,
+            targetDirectory: fixture.sourceDirectory,
+            operation: .copy,
+            conflictPolicy: .replace
+        )
+
+        XCTAssertEqual(result.destinationURL?.standardizedFileURL, sourceFile.standardizedFileURL)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: sourceFile.path))
+        XCTAssertEqual(try String(contentsOf: sourceFile, encoding: .utf8), "keep me")
+    }
+
     func testCopyFileKeepsOriginalAndCreatesTarget() throws {
         let fixture = try FileTransferFixture()
         defer { fixture.cleanUp() }
@@ -97,6 +115,48 @@ extension FileTransferServiceTests {
         XCTAssertTrue(FileManager.default.fileExists(atPath: sourceFile.path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: destinationURL.path))
         XCTAssertEqual(try String(contentsOf: destinationURL, encoding: .utf8), "hello")
+    }
+
+    func testCopyFileWithReplaceOverwritesDifferentTargetAndKeepsSource() throws {
+        let fixture = try FileTransferFixture()
+        defer { fixture.cleanUp() }
+        let sourceFile = try fixture.createSourceFile(named: "Same.txt", contents: "source")
+        let targetFile = try fixture.createTargetFile(named: "Same.txt", contents: "target")
+        let service = FileTransferService()
+
+        let result = try service.transfer(
+            sourceURL: sourceFile,
+            targetDirectory: fixture.targetDirectory,
+            operation: .copy,
+            conflictPolicy: .replace
+        )
+
+        let destinationURL = try XCTUnwrap(result.destinationURL)
+        XCTAssertEqual(destinationURL.standardizedFileURL, targetFile.standardizedFileURL)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: sourceFile.path))
+        XCTAssertEqual(try String(contentsOf: sourceFile, encoding: .utf8), "source")
+        XCTAssertEqual(try String(contentsOf: destinationURL, encoding: .utf8), "source")
+    }
+
+    func testCopyFolderCreatesTargetFolderWithContents() throws {
+        let fixture = try FileTransferFixture()
+        defer { fixture.cleanUp() }
+        let sourceFolder = try fixture.createSourceFolder(named: "Project", childName: "Notes.txt", contents: "folder")
+        let service = FileTransferService()
+
+        let result = try service.transfer(
+            sourceURL: sourceFolder,
+            targetDirectory: fixture.targetDirectory,
+            operation: .copy,
+            conflictPolicy: .replace
+        )
+
+        let destinationURL = try XCTUnwrap(result.destinationURL)
+        let sourceChild = sourceFolder.appendingPathComponent("Notes.txt")
+        let destinationChild = destinationURL.appendingPathComponent("Notes.txt")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: sourceChild.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: destinationChild.path))
+        XCTAssertEqual(try String(contentsOf: destinationChild, encoding: .utf8), "folder")
     }
 
     func testMoveFileRemovesOriginalAndCreatesTarget() throws {
@@ -154,6 +214,13 @@ private struct FileTransferFixture {
         let url = sourceDirectory.appendingPathComponent(name)
         try contents.write(to: url, atomically: true, encoding: .utf8)
         return url
+    }
+
+    func createSourceFolder(named name: String, childName: String, contents: String) throws -> URL {
+        let folderURL = sourceDirectory.appendingPathComponent(name, isDirectory: true)
+        try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+        try contents.write(to: folderURL.appendingPathComponent(childName), atomically: true, encoding: .utf8)
+        return folderURL
     }
 
     func createTargetFile(named name: String, contents: String) throws -> URL {
