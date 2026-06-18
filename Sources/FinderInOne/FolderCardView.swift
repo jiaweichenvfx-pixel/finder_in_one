@@ -24,15 +24,16 @@ struct FolderCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             header
             Divider()
+                .overlay(Color.white.opacity(0.18))
             if let errorMessage {
                 Text(errorMessage)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.68))
                 Spacer(minLength: 0)
             } else if items.isEmpty {
                 Text("No visible items")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.68))
                 Spacer(minLength: 0)
             } else {
                 fileRows
@@ -42,7 +43,8 @@ struct FolderCardView: View {
             }
         }
         .padding(10)
-        .background(.regularMaterial)
+        .foregroundStyle(.white.opacity(0.9))
+        .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
@@ -89,7 +91,7 @@ struct FolderCardView: View {
                 .font(.headline)
             Text(card.folderPath)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.62))
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -120,6 +122,7 @@ struct FolderCardView: View {
                         Text(item.byteSize.map(Self.byteFormatter.string(fromByteCount:)) ?? "--")
                         Text(item.kind)
                     }
+                    .foregroundStyle(.white.opacity(0.82))
                     .onDrag {
                         NSItemProvider(object: item.url as NSURL)
                     }
@@ -153,7 +156,7 @@ struct FolderCardView: View {
             Spacer()
             Image(systemName: "arrow.down.right")
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.58))
                 .frame(width: 18, height: 18)
                 .contentShape(Rectangle())
                 .gesture(
@@ -173,6 +176,10 @@ struct FolderCardView: View {
         }
     }
 
+    private var cardBackground: Color {
+        card.isLocked ? Color(red: 0.18, green: 0.20, blue: 0.22) : Color(red: 0.15, green: 0.16, blue: 0.18)
+    }
+
     private var borderColor: Color {
         if isDropTargeted {
             return .accentColor
@@ -180,7 +187,7 @@ struct FolderCardView: View {
         if card.isLocked {
             return Color.accentColor.opacity(0.55)
         }
-        return Color.secondary.opacity(0.25)
+        return Color.white.opacity(0.16)
     }
 
     private func handleDrop(providers: [NSItemProvider]) -> Bool {

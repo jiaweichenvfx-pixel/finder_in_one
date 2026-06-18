@@ -7,6 +7,5 @@ struct FinderInOneApp: App {
             WorkspaceView()
                 .frame(minWidth: 900, minHeight: 600)
         }
-        .windowStyle(.hiddenTitleBar)
     }
 }
