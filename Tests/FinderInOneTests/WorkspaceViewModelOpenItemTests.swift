@@ -79,6 +79,95 @@ final class WorkspaceViewModelOpenItemTests: XCTestCase {
 
         XCTAssertEqual(previewedURLs, [firstURL, secondURL])
     }
+
+    func testOpenInFinderSelectsCurrentCardSelection() throws {
+        let fixture = try WorkspaceViewModelOpenItemFixture()
+        defer { fixture.cleanUp() }
+        let firstURL = try fixture.createFile(named: "first.jpg", contents: "image")
+        let secondURL = try fixture.createFile(named: "second.jpg", contents: "image")
+        try fixture.saveWorkspace()
+        var openedFolderURL: URL?
+        var selectedURLs: [URL] = []
+        let viewModel = WorkspaceViewModel(
+            store: fixture.store,
+            finderOpening: FinderOpening { folderURL, urls in
+                openedFolderURL = folderURL
+                selectedURLs = urls
+            }
+        )
+        viewModel.setSelectedItemURLs([secondURL, firstURL], for: fixture.card.id)
+
+        viewModel.openInFinder(card: fixture.card)
+
+        XCTAssertEqual(openedFolderURL, fixture.folderURL)
+        XCTAssertEqual(Set(selectedURLs), [firstURL, secondURL])
+    }
+
+    func testOpenInFinderIgnoresStaleSelectionOutsideCurrentCardFolder() throws {
+        let fixture = try WorkspaceViewModelOpenItemFixture()
+        defer { fixture.cleanUp() }
+        let staleURL = fixture.root.appendingPathComponent("old.txt")
+        try "old".write(to: staleURL, atomically: true, encoding: .utf8)
+        try fixture.saveWorkspace()
+        var openedFolderURL: URL?
+        var selectedURLs: [URL] = [staleURL]
+        let viewModel = WorkspaceViewModel(
+            store: fixture.store,
+            finderOpening: FinderOpening { folderURL, urls in
+                openedFolderURL = folderURL
+                selectedURLs = urls
+            }
+        )
+        viewModel.setSelectedItemURLs([staleURL], for: fixture.card.id)
+
+        viewModel.openInFinder(card: fixture.card)
+
+        XCTAssertEqual(openedFolderURL, fixture.folderURL)
+        XCTAssertTrue(selectedURLs.isEmpty)
+    }
+
+    func testOpenInFinderOpensCardFolderWhenNothingIsSelected() throws {
+        let fixture = try WorkspaceViewModelOpenItemFixture()
+        defer { fixture.cleanUp() }
+        try fixture.saveWorkspace()
+        var openedFolderURL: URL?
+        var selectedURLs: [URL] = [fixture.folderURL.appendingPathComponent("stale.txt")]
+        let viewModel = WorkspaceViewModel(
+            store: fixture.store,
+            finderOpening: FinderOpening { folderURL, urls in
+                openedFolderURL = folderURL
+                selectedURLs = urls
+            }
+        )
+
+        viewModel.openInFinder(card: fixture.card)
+
+        XCTAssertEqual(openedFolderURL, fixture.folderURL)
+        XCTAssertTrue(selectedURLs.isEmpty)
+    }
+
+    func testPreviewItemsCanStartAtSelectedItemIndex() throws {
+        let fixture = try WorkspaceViewModelOpenItemFixture()
+        defer { fixture.cleanUp() }
+        let firstURL = try fixture.createFile(named: "first.jpg", contents: "image")
+        let secondURL = try fixture.createFile(named: "second.jpg", contents: "image")
+        try fixture.saveWorkspace()
+        var previewedURLs: [URL] = []
+        var previewedIndex: Int?
+        let viewModel = WorkspaceViewModel(
+            store: fixture.store,
+            filePreviewing: FilePreviewing { urls, selectedIndex in
+                previewedURLs = urls
+                previewedIndex = selectedIndex
+            }
+        )
+        let items = try XCTUnwrap(viewModel.itemsByCardID[fixture.card.id])
+
+        viewModel.preview(items: items, startingAt: secondURL)
+
+        XCTAssertEqual(previewedURLs, [firstURL, secondURL])
+        XCTAssertEqual(previewedIndex, 1)
+    }
 }
 
 private struct WorkspaceViewModelOpenItemFixture {

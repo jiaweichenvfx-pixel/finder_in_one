@@ -53,6 +53,25 @@ final class FolderCardTests: XCTestCase {
         XCTAssertEqual(card.frame.width, 180)
         XCTAssertEqual(card.frame.height, 120)
     }
+
+    func testCollapseStoresExpandedFrameAndRestoreReturnsToPreviousSize() {
+        var card = FolderCard(
+            displayName: "Shots",
+            folderPath: "/Users/test/Shots",
+            frame: CardFrame(x: 30, y: 40, width: 420, height: 280)
+        )
+
+        XCTAssertTrue(card.collapse())
+
+        XCTAssertTrue(card.isCollapsed)
+        XCTAssertEqual(card.expandedFrame, CardFrame(x: 30, y: 40, width: 420, height: 280))
+        XCTAssertEqual(card.frame, CardFrame(x: 30, y: 40, width: 420, height: FolderCard.collapsedHeight))
+
+        XCTAssertTrue(card.expand())
+        XCTAssertFalse(card.isCollapsed)
+        XCTAssertNil(card.expandedFrame)
+        XCTAssertEqual(card.frame, CardFrame(x: 30, y: 40, width: 420, height: 280))
+    }
 }
 
 extension FolderCardTests {
@@ -174,5 +193,31 @@ extension FolderCardTests {
         )
 
         XCTAssertEqual(card.folderURL, URL(fileURLWithPath: "/tmp/Projects", isDirectory: true))
+    }
+
+    func testFolderCardDefaultsToGraphiteColor() {
+        let card = FolderCard(
+            displayName: "Projects",
+            folderPath: "/tmp/Projects",
+            frame: CardFrame(x: 0, y: 0, width: 240, height: 180)
+        )
+
+        XCTAssertEqual(card.color, .graphite)
+    }
+
+    func testFolderCardDecodesMissingColorAsGraphite() throws {
+        let json = """
+        {
+          "id" : "55555555-5555-5555-5555-555555555555",
+          "displayName" : "Projects",
+          "folderPath" : "/tmp/Projects",
+          "frame" : { "x" : 0, "y" : 0, "width" : 240, "height" : 180 },
+          "isLocked" : false
+        }
+        """
+
+        let card = try JSONDecoder().decode(FolderCard.self, from: Data(json.utf8))
+
+        XCTAssertEqual(card.color, .graphite)
     }
 }

@@ -156,12 +156,184 @@ final class WorkspaceViewModelLayoutTests: XCTestCase {
         XCTAssertEqual(viewModel.itemsByCardID[card.id]?.map(\.name), ["note.txt"])
         XCTAssertEqual(try fixture.store.load().cards.map(\.folderPath), [externalFolder.path])
     }
+
+    func testAddFolderURLFocusesExistingCardWhenFolderAlreadyExists() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
+        defer { fixture.cleanUp() }
+        try fixture.saveWorkspace()
+        let viewModel = WorkspaceViewModel(store: fixture.store, templateStore: fixture.templateStore)
+
+        let added = viewModel.addFolder(url: fixture.folderURL)
+
+        XCTAssertEqual(added?.id, fixture.card.id)
+        XCTAssertEqual(viewModel.workspace.cards, [fixture.card])
+        XCTAssertEqual(viewModel.focusedCardID, fixture.card.id)
+        XCTAssertEqual(try fixture.store.load().cards, [fixture.card])
+    }
+
+    func testAddDroppedFolderURLsAddsOnlyDirectoriesAtDropPoint() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
+        defer { fixture.cleanUp() }
+        let folder = try fixture.createFolder(named: "FinderWindow")
+        let file = try fixture.createFile(named: "loose-file.txt", contents: "ignore")
+        let viewModel = WorkspaceViewModel(store: fixture.store, templateStore: fixture.templateStore)
+
+        let added = viewModel.addDroppedFolderURLs([file, folder], at: CGPoint(x: 180, y: 120))
+
+        XCTAssertTrue(added)
+        XCTAssertEqual(viewModel.workspace.cards.count, 1)
+        let card = try XCTUnwrap(viewModel.workspace.cards.first)
+        XCTAssertEqual(card.displayName, "FinderWindow")
+        XCTAssertEqual(card.folderPath, folder.path)
+        XCTAssertEqual(card.frame.x, 180)
+        XCTAssertEqual(card.frame.y, 120)
+        XCTAssertEqual(try fixture.store.load().cards.map(\.folderPath), [folder.path])
+    }
+
+    func testAddDroppedFileURLsIgnoresNonDirectories() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
+        defer { fixture.cleanUp() }
+        let file = try fixture.createFile(named: "loose-file.txt", contents: "ignore")
+        let viewModel = WorkspaceViewModel(store: fixture.store, templateStore: fixture.templateStore)
+
+        let added = viewModel.addDroppedFolderURLs([file], at: CGPoint(x: 180, y: 120))
+
+        XCTAssertFalse(added)
+        XCTAssertTrue(viewModel.workspace.cards.isEmpty)
+        XCTAssertTrue(try fixture.store.load().cards.isEmpty)
+    }
+
+    func testAddDroppedChildFolderFromExistingCardCreatesNewFolderCard() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
+        defer { fixture.cleanUp() }
+        let childFolder = fixture.folderURL.appendingPathComponent("Shots", isDirectory: true)
+        try FileManager.default.createDirectory(at: childFolder, withIntermediateDirectories: true)
+        try fixture.saveWorkspace()
+        let viewModel = WorkspaceViewModel(store: fixture.store, templateStore: fixture.templateStore)
+
+        let added = viewModel.addDroppedFolderURLs([childFolder], at: CGPoint(x: 420, y: 260))
+
+        XCTAssertTrue(added)
+        XCTAssertEqual(viewModel.workspace.cards.map(\.folderPath), [fixture.folderURL.path, childFolder.path])
+        let childCard = try XCTUnwrap(viewModel.workspace.cards.last)
+        XCTAssertEqual(childCard.displayName, "Shots")
+        XCTAssertEqual(childCard.frame.x, 420)
+        XCTAssertEqual(childCard.frame.y, 260)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: childFolder.path))
+    }
+
+    func testTemplateOpenReplacesCurrentCanvasAndRefreshesCards() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
+        defer { fixture.cleanUp() }
+        let savedFolder = try fixture.createFolder(named: "Saved")
+        try "saved".write(to: savedFolder.appendingPathComponent("saved.txt"), atomically: true, encoding: .utf8)
+        let currentFolder = try fixture.createFolder(named: "Current")
+        try "current".write(to: currentFolder.appendingPathComponent("current.txt"), atomically: true, encoding: .utf8)
+        let savedCard = FolderCard(
+            displayName: "Saved",
+            folderPath: savedFolder.path,
+            frame: CardFrame(x: 10, y: 20, width: 360, height: 240)
+        )
+        let currentCard = FolderCard(
+            displayName: "Current",
+            folderPath: currentFolder.path,
+            frame: CardFrame(x: 300, y: 40, width: 360, height: 240)
+        )
+        try fixture.store.save(Workspace(cards: [savedCard]))
+        var templateLibrary = WorkspaceTemplateLibrary()
+        templateLibrary.saveTemplate(Workspace(cards: [savedCard]), at: 0, name: "Saved Set")
+        try fixture.templateStore.save(templateLibrary)
+        let viewModel = WorkspaceViewModel(store: fixture.store, templateStore: fixture.templateStore)
+        viewModel.workspace = Workspace(cards: [currentCard])
+
+        XCTAssertTrue(viewModel.openTemplate(at: 0))
+
+        XCTAssertEqual(viewModel.workspace.cards, [savedCard])
+        XCTAssertEqual(viewModel.activeTemplateIndex, 0)
+        XCTAssertEqual(viewModel.itemsByCardID[savedCard.id]?.map(\.name), ["saved.txt"])
+        XCTAssertEqual(try fixture.store.load().cards, [savedCard])
+    }
+
+    func testTemplateRenameDeleteAndOverwriteUpdateTemplateSlots() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
+        defer { fixture.cleanUp() }
+        let firstCard = fixture.card
+        let secondCard = fixture.makeCard(displayName: "Second", isLocked: false)
+        try fixture.store.save(Workspace(cards: [firstCard]))
+        let viewModel = WorkspaceViewModel(store: fixture.store, templateStore: fixture.templateStore)
+
+        XCTAssertTrue(viewModel.saveTemplate(at: 1, name: "Daily"))
+        XCTAssertTrue(viewModel.renameTemplate(at: 1, name: "Client Daily"))
+        viewModel.workspace = Workspace(cards: [secondCard])
+        XCTAssertTrue(viewModel.overwriteTemplate(at: 1))
+
+        XCTAssertEqual(viewModel.templateSlots[1].template?.name, "Client Daily")
+        XCTAssertEqual(viewModel.templateSlots[1].template?.workspace.cards, [secondCard])
+
+        XCTAssertTrue(viewModel.deleteTemplate(at: 1))
+        XCTAssertNil(viewModel.templateSlots[1].template)
+    }
+
+    func testSaveTemplateNormalizesExtremeCardPositionsBeforePersisting() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
+        defer { fixture.cleanUp() }
+        let offscreenCard = FolderCard(
+            displayName: "Lost",
+            folderPath: fixture.folderURL.path,
+            frame: CardFrame(x: -731_420_695, y: -285_007_347, width: 360, height: 240)
+        )
+        try fixture.store.save(Workspace(cards: [offscreenCard]))
+        let viewModel = WorkspaceViewModel(store: fixture.store, templateStore: fixture.templateStore)
+
+        XCTAssertTrue(viewModel.saveTemplate(at: 0, name: "Recovered"))
+
+        let savedCard = try XCTUnwrap(viewModel.templateSlots[0].template?.workspace.cards.first)
+        XCTAssertGreaterThanOrEqual(savedCard.frame.x, 20)
+        XCTAssertGreaterThanOrEqual(savedCard.frame.y, 20)
+        XCTAssertLessThan(savedCard.frame.x, 2_000)
+        XCTAssertLessThan(savedCard.frame.y, 2_000)
+    }
+
+    func testOpenTemplateNormalizesExtremeCardPositionsBeforeReplacingCanvas() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
+        defer { fixture.cleanUp() }
+        let offscreenCard = FolderCard(
+            displayName: "Lost",
+            folderPath: fixture.folderURL.path,
+            frame: CardFrame(x: -731_420_695, y: -285_007_347, width: 360, height: 240)
+        )
+        var templateLibrary = WorkspaceTemplateLibrary()
+        templateLibrary.saveTemplate(Workspace(cards: [offscreenCard]), at: 0, name: "Recovered")
+        try fixture.templateStore.save(templateLibrary)
+        let viewModel = WorkspaceViewModel(store: fixture.store, templateStore: fixture.templateStore)
+
+        XCTAssertTrue(viewModel.openTemplate(at: 0))
+
+        let openedCard = try XCTUnwrap(viewModel.workspace.cards.first)
+        XCTAssertGreaterThanOrEqual(openedCard.frame.x, 20)
+        XCTAssertGreaterThanOrEqual(openedCard.frame.y, 20)
+        XCTAssertLessThan(openedCard.frame.x, 2_000)
+        XCTAssertLessThan(openedCard.frame.y, 2_000)
+    }
+
+    func testSetCardColorUpdatesWorkspaceAndPersists() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
+        defer { fixture.cleanUp() }
+        try fixture.saveWorkspace()
+        let viewModel = WorkspaceViewModel(store: fixture.store, templateStore: fixture.templateStore)
+
+        XCTAssertTrue(viewModel.setCardColor(.blue, for: fixture.card.id))
+
+        XCTAssertEqual(viewModel.workspace.cards.first?.color, .blue)
+        XCTAssertEqual(try fixture.store.load().cards.first?.color, .blue)
+    }
 }
 
 private struct WorkspaceViewModelLayoutFixture {
     let root: URL
     let folderURL: URL
     let store: WorkspaceStore
+    let templateStore: WorkspaceTemplateStore
     let card: FolderCard
 
     init(isLocked: Bool, filePath: String = #filePath) throws {
@@ -170,6 +342,7 @@ private struct WorkspaceViewModelLayoutFixture {
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         folderURL = root.appendingPathComponent("Card", isDirectory: true)
         store = WorkspaceStore(fileURL: root.appendingPathComponent("workspace.json"))
+        templateStore = WorkspaceTemplateStore(fileURL: root.appendingPathComponent("templates.json"))
         card = FolderCard(
             displayName: "Card",
             folderPath: folderURL.path,
@@ -196,6 +369,12 @@ private struct WorkspaceViewModelLayoutFixture {
     func createFolder(named name: String) throws -> URL {
         let url = root.appendingPathComponent(name, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    func createFile(named name: String, contents: String) throws -> URL {
+        let url = root.appendingPathComponent(name)
+        try contents.write(to: url, atomically: true, encoding: .utf8)
         return url
     }
 

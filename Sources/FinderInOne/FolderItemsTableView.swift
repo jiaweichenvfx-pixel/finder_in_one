@@ -3,13 +3,34 @@ import FinderWorkbenchCore
 import SwiftUI
 import UniformTypeIdentifiers
 
+extension TransferMode {
+    var dragOperation: NSDragOperation {
+        switch self {
+        case .copy:
+            return .copy
+        case .moveOnce:
+            return .move
+        }
+    }
+
+    var dropProposalOperation: DropOperation {
+        switch self {
+        case .copy:
+            return .copy
+        case .moveOnce:
+            return .move
+        }
+    }
+}
+
 @MainActor
 struct FolderItemsTableView: NSViewRepresentable {
     let items: [FileItem]
     let selectedItemURLs: Set<URL>
+    let transferMode: TransferMode
     let onSelectionChange: (Set<URL>) -> Void
     let onOpenItem: (FileItem) -> Void
-    let onPreviewItems: ([FileItem]) -> Void
+    let onPreviewItems: ([FileItem], FileItem?) -> Void
     let onDropURLs: ([URL]) -> Bool
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -27,8 +48,9 @@ struct FolderItemsTableView: NSViewRepresentable {
         tableView.delegate = context.coordinator
         tableView.target = context.coordinator
         tableView.doubleAction = #selector(Coordinator.doubleClicked(_:))
-        tableView.setDraggingSourceOperationMask([.copy, .move], forLocal: true)
-        tableView.setDraggingSourceOperationMask([.copy, .move], forLocal: false)
+        tableView.sortDescriptors = [NSSortDescriptor(key: "name", ascending: true)]
+        tableView.setDraggingSourceOperationMask(transferMode.dragOperation, forLocal: true)
+        tableView.setDraggingSourceOperationMask(transferMode.dragOperation, forLocal: false)
         tableView.registerForDraggedTypes([.fileURL])
 
         addColumn("name", title: "Name", width: 190, to: tableView)
@@ -54,19 +76,21 @@ struct FolderItemsTableView: NSViewRepresentable {
         if let tableView = tableView as? FinderTableView {
             tableView.coordinator = context.coordinator
         }
+        tableView.setDraggingSourceOperationMask(transferMode.dragOperation, forLocal: true)
+        tableView.setDraggingSourceOperationMask(transferMode.dragOperation, forLocal: false)
 
         let itemFingerprint = items
-        let selection = selectedRows()
         let shouldReload = context.coordinator.lastItemFingerprint != itemFingerprint
         let shouldSelect = shouldReload || context.coordinator.lastSelectedItemURLs != selectedItemURLs
 
         if shouldReload {
+            context.coordinator.refreshSortedItems()
             tableView.reloadData()
             context.coordinator.lastItemFingerprint = itemFingerprint
         }
         if shouldSelect {
             context.coordinator.isApplyingSelection = true
-            tableView.selectRowIndexes(selection, byExtendingSelection: false)
+            tableView.selectRowIndexes(context.coordinator.selectedRows(for: selectedItemURLs), byExtendingSelection: false)
             context.coordinator.isApplyingSelection = false
             context.coordinator.lastSelectedItemURLs = selectedItemURLs
         }
@@ -76,14 +100,11 @@ struct FolderItemsTableView: NSViewRepresentable {
         Coordinator(self)
     }
 
-    private func selectedRows() -> IndexSet {
-        IndexSet(items.indices.filter { selectedItemURLs.contains(items[$0].url) })
-    }
-
     private func addColumn(_ identifier: String, title: String, width: CGFloat, to tableView: NSTableView) {
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
         column.title = title
         column.headerCell = FinderTableHeaderCell(textCell: title)
+        column.sortDescriptorPrototype = NSSortDescriptor(key: identifier, ascending: true)
         column.width = width
         column.minWidth = 54
         column.resizingMask = .userResizingMask
@@ -96,17 +117,20 @@ struct FolderItemsTableView: NSViewRepresentable {
         var isApplyingSelection = false
         var lastItemFingerprint: [FileItem] = []
         var lastSelectedItemURLs: Set<URL> = []
+        private var sortedItems: [FileItem] = []
+        private var sortOrder = FileItemSortOrder(column: .name, ascending: true)
 
         init(_ parent: FolderItemsTableView) {
             self.parent = parent
+            self.sortedItems = FileItemSorter.sorted(parent.items, by: sortOrder)
         }
 
         func numberOfRows(in tableView: NSTableView) -> Int {
-            parent.items.count
+            sortedItems.count
         }
 
         func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-            guard row < parent.items.count, let tableColumn else {
+            guard let item = item(at: row), let tableColumn else {
                 return nil
             }
 
@@ -115,14 +139,14 @@ struct FolderItemsTableView: NSViewRepresentable {
                 let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? FinderNameCellView
                     ?? FinderNameCellView()
                 cell.identifier = identifier
-                cell.configure(with: parent.items[row])
+                cell.configure(with: item)
                 return cell
             }
 
             let textField = tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTextField
                 ?? NSTextField(labelWithString: "")
             textField.identifier = identifier
-            textField.stringValue = value(for: parent.items[row], column: identifier.rawValue)
+            textField.stringValue = value(for: item, column: identifier.rawValue)
             textField.lineBreakMode = .byTruncatingMiddle
             textField.maximumNumberOfLines = 1
             textField.font = .systemFont(ofSize: 12)
@@ -142,19 +166,29 @@ struct FolderItemsTableView: NSViewRepresentable {
             }
 
             let selectedURLs = Set(tableView.selectedRowIndexes.compactMap { row -> URL? in
-                guard row < parent.items.count else {
-                    return nil
-                }
-                return parent.items[row].url
+                item(at: row)?.url
             })
             parent.onSelectionChange(selectedURLs)
         }
 
         func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
-            guard row < parent.items.count else {
-                return nil
+            item(at: row)?.url as NSURL?
+        }
+
+        func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
+            guard let descriptor = tableView.sortDescriptors.first,
+                  let key = descriptor.key,
+                  let column = FileItemSortColumn(rawValue: key) else {
+                return
             }
-            return parent.items[row].url as NSURL
+
+            sortOrder = FileItemSortOrder(column: column, ascending: descriptor.ascending)
+            refreshSortedItems()
+            tableView.reloadData()
+
+            isApplyingSelection = true
+            tableView.selectRowIndexes(selectedRows(for: parent.selectedItemURLs), byExtendingSelection: false)
+            isApplyingSelection = false
         }
 
         func tableView(
@@ -167,7 +201,7 @@ struct FolderItemsTableView: NSViewRepresentable {
                 return []
             }
             tableView.setDropRow(-1, dropOperation: .on)
-            return .copy
+            return parent.transferMode.dragOperation
         }
 
         func tableView(
@@ -184,27 +218,66 @@ struct FolderItemsTableView: NSViewRepresentable {
         }
 
         @objc func doubleClicked(_ sender: NSTableView) {
-            guard sender.clickedRow >= 0, sender.clickedRow < parent.items.count else {
+            guard let item = item(at: sender.clickedRow) else {
                 return
             }
-            parent.onOpenItem(parent.items[sender.clickedRow])
+            parent.onOpenItem(item)
         }
 
         func previewSelection(in tableView: NSTableView) {
             let selectedItems = tableView.selectedRowIndexes.compactMap { row -> FileItem? in
-                guard row < parent.items.count else {
-                    return nil
-                }
-                return parent.items[row]
+                item(at: row)
             }
 
             if selectedItems.isEmpty,
-               tableView.clickedRow >= 0,
-               tableView.clickedRow < parent.items.count {
-                parent.onPreviewItems([parent.items[tableView.clickedRow]])
+               let clickedItem = item(at: tableView.clickedRow) {
+                parent.onPreviewItems(sortedItems, clickedItem)
+            } else if selectedItems.count == 1, let first = selectedItems.first {
+                parent.onPreviewItems(sortedItems, first)
             } else {
-                parent.onPreviewItems(selectedItems)
+                parent.onPreviewItems(selectedItems, selectedItems.first)
             }
+        }
+
+        func previewAdjacentSelection(in tableView: NSTableView, direction: Int) {
+            guard !sortedItems.isEmpty else {
+                return
+            }
+
+            let currentRow: Int
+            if direction < 0 {
+                currentRow = tableView.selectedRowIndexes.min() ?? tableView.clickedRow
+            } else {
+                currentRow = tableView.selectedRowIndexes.max() ?? tableView.clickedRow
+            }
+
+            let fallbackRow = currentRow >= 0 ? currentRow : 0
+            let nextRow = min(max(fallbackRow + direction, 0), sortedItems.count - 1)
+            guard let nextItem = item(at: nextRow) else {
+                return
+            }
+
+            isApplyingSelection = true
+            tableView.selectRowIndexes(IndexSet(integer: nextRow), byExtendingSelection: false)
+            tableView.scrollRowToVisible(nextRow)
+            isApplyingSelection = false
+            parent.onSelectionChange([nextItem.url])
+            parent.onPreviewItems(sortedItems, nextItem)
+        }
+
+        func refreshSortedItems() {
+            sortedItems = FileItemSorter.sorted(parent.items, by: sortOrder)
+        }
+
+        func selectedRows(for selectedItemURLs: Set<URL>) -> IndexSet {
+            IndexSet(sortedItems.indices.filter { selectedItemURLs.contains(sortedItems[$0].url) })
+        }
+
+        private func item(at row: Int) -> FileItem? {
+            guard row >= 0, row < sortedItems.count else {
+                return nil
+            }
+            return sortedItems[row]
         }
 
         private func value(for item: FileItem, column: String) -> String {
@@ -323,6 +396,14 @@ private final class FinderTableView: NSTableView {
     override func keyDown(with event: NSEvent) {
         if event.charactersIgnoringModifiers == " " {
             coordinator?.previewSelection(in: self)
+            return
+        }
+        if FilePreviewing.isPreviewVisible, event.keyCode == 126 {
+            coordinator?.previewAdjacentSelection(in: self, direction: -1)
+            return
+        }
+        if FilePreviewing.isPreviewVisible, event.keyCode == 125 {
+            coordinator?.previewAdjacentSelection(in: self, direction: 1)
             return
         }
         super.keyDown(with: event)

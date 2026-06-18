@@ -7,46 +7,51 @@ struct FolderCardView: View {
     let items: [FileItem]
     let errorMessage: String?
     let onToggleLock: () -> Void
+    let onToggleCollapse: () -> Void
     let onNavigateUp: () -> Void
     let onOpenInFinder: () -> Void
     let onClose: () -> Void
-    let onMoveEarlier: () -> Void
-    let onMoveLater: () -> Void
+    let onSetColor: (FolderCardColor) -> Void
     let selectedItemURLs: Set<URL>
+    let transferMode: TransferMode
     let onSelectionChange: (Set<URL>) -> Void
     let onDropFiles: ([URL]) -> Bool
     let onOpenItem: (FileItem) -> Void
-    let onPreviewItems: ([FileItem]) -> Void
+    let onPreviewItems: ([FileItem], FileItem?) -> Void
     let onMoveTo: (Double, Double, Bool) -> Void
     let onResize: (Double, Double, Bool) -> Void
+    let viewportScale: CGFloat
 
     @State private var isDropTargeted = false
     @State private var moveStartFrame: CardFrame?
+    @State private var moveTranslation: CGSize = .zero
     @State private var resizeStartFrame: CardFrame?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             header
-            Divider()
-                .overlay(Color.white.opacity(0.18))
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.68))
-                Spacer(minLength: 0)
-            } else if items.isEmpty {
-                Text("No visible items")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.68))
-                Spacer(minLength: 0)
-            } else {
-                fileRows
-            }
-            if card.canResize {
-                resizeHandle
+            if !card.isCollapsed {
+                Divider()
+                    .overlay(Color.white.opacity(0.18))
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.68))
+                    Spacer(minLength: 0)
+                } else if items.isEmpty {
+                    Text("No visible items")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.68))
+                    Spacer(minLength: 0)
+                } else {
+                    fileRows
+                }
+                if card.canResize {
+                    resizeHandle
+                }
             }
         }
-        .padding(10)
+        .padding(card.isCollapsed ? 8 : 10)
         .foregroundStyle(.white.opacity(0.9))
         .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -54,55 +59,67 @@ struct FolderCardView: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(borderColor, lineWidth: isDropTargeted ? 2 : 1)
         )
-        .onDrop(of: [.fileURL], isTargeted: $isDropTargeted, perform: handleDrop(providers:))
+        .onDrop(of: [.fileURL, .url], isTargeted: $isDropTargeted, perform: handleDrop(providers:))
+        .offset(moveTranslation)
     }
 
     private var header: some View {
-        HStack(alignment: .top) {
+        HStack(alignment: .top, spacing: 8) {
             titleArea
+            headerControls
+                .fixedSize(horizontal: true, vertical: false)
+        }
+    }
+
+    private var headerControls: some View {
+        HStack(spacing: 6) {
             HStack(spacing: 4) {
-                if card.canMove {
-                    Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 18, height: 18)
-                        .contentShape(Rectangle())
-                        .gesture(moveGesture)
-                        .help("Drag card")
-                    Button(action: onMoveEarlier) {
-                        Image(systemName: "chevron.left")
-                    }
-                    .help("Move earlier")
-                    Button(action: onMoveLater) {
-                        Image(systemName: "chevron.right")
-                    }
-                    .help("Move later")
-                }
                 Button(action: onNavigateUp) {
                     Image(systemName: "arrow.up")
                 }
                 .help("Parent folder")
+                Button(action: onToggleCollapse) {
+                    Image(systemName: card.isCollapsed ? "chevron.down" : "chevron.up")
+                }
+                .help(card.isCollapsed ? "Restore card" : "Collapse card")
+                Menu {
+                    ForEach(FolderCardColor.allCases, id: \.self) { color in
+                        Button {
+                            onSetColor(color)
+                        } label: {
+                            Label(color.label, systemImage: color == card.color ? "checkmark.circle.fill" : "circle")
+                        }
+                    }
+                } label: {
+                    Text("Color")
+                }
+                .menuStyle(.button)
+                .help("Card color")
                 Button(card.isLocked ? "Unlock" : "Lock", action: onToggleLock)
                 Button("Finder", action: onOpenInFinder)
                 if card.canClose {
                     Button("Close", action: onClose)
                 }
             }
-            .font(.system(size: 11))
         }
+        .font(.system(size: 11))
     }
 
     @ViewBuilder
     private var titleArea: some View {
         let content = VStack(alignment: .leading, spacing: 2) {
             Text(card.displayName)
-                .font(.headline)
-            Text(card.folderPath)
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.62))
+                .font(card.isCollapsed ? .subheadline : .headline)
                 .lineLimit(1)
+            if !card.isCollapsed {
+                Text(card.folderPath)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.62))
+                    .lineLimit(1)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .layoutPriority(1)
 
         if card.canMove {
             content
@@ -118,6 +135,7 @@ struct FolderCardView: View {
         FolderItemsTableView(
             items: items,
             selectedItemURLs: selectedItemURLs,
+            transferMode: transferMode,
             onSelectionChange: onSelectionChange,
             onOpenItem: onOpenItem,
             onPreviewItems: onPreviewItems,
@@ -128,13 +146,8 @@ struct FolderCardView: View {
     private var moveGesture: some Gesture {
         DragGesture(minimumDistance: 2)
             .onChanged { value in
-                let startFrame = moveStartFrame ?? card.frame
-                moveStartFrame = startFrame
-                onMoveTo(
-                    startFrame.x + value.translation.width,
-                    startFrame.y + value.translation.height,
-                    false
-                )
+                moveStartFrame = moveStartFrame ?? card.frame
+                moveTranslation = value.translation
             }
             .onEnded { value in
                 let startFrame = moveStartFrame ?? card.frame
@@ -143,6 +156,7 @@ struct FolderCardView: View {
                     startFrame.y + value.translation.height,
                     true
                 )
+                moveTranslation = .zero
                 moveStartFrame = nil
             }
     }
@@ -180,7 +194,7 @@ struct FolderCardView: View {
     }
 
     private var cardBackground: Color {
-        card.isLocked ? Color(red: 0.18, green: 0.20, blue: 0.22) : Color(red: 0.15, green: 0.16, blue: 0.18)
+        card.isLocked ? card.color.lockedBackgroundColor : card.color.backgroundColor
     }
 
     private var borderColor: Color {
@@ -188,38 +202,114 @@ struct FolderCardView: View {
             return .accentColor
         }
         if card.isLocked {
-            return Color.accentColor.opacity(0.55)
+            return card.color.accentColor.opacity(0.58)
         }
-        return Color.white.opacity(0.16)
+        return card.color.accentColor.opacity(card.color == .graphite ? 0.20 : 0.44)
     }
 
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
-        guard let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) }) else {
+        let fileProviders = providers.filter { provider in
+            provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier)
+                || provider.hasItemConformingToTypeIdentifier(UTType.url.identifier)
+        }
+        guard !fileProviders.isEmpty else {
             return false
         }
 
-        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-            guard let url = Self.fileURL(from: item) else {
+        let group = DispatchGroup()
+        let collector = DropURLCollector()
+
+        for provider in fileProviders {
+            group.enter()
+            DropURLParsing.loadFileURL(from: provider) { url in
+                if let url {
+                    collector.append(url)
+                }
+                group.leave()
+            }
+        }
+
+        group.notify(queue: .main) {
+            let urls = collector.urls
+            guard !urls.isEmpty else {
                 return
             }
-            DispatchQueue.main.async {
-                _ = onDropFiles([url])
-            }
+            _ = onDropFiles(urls)
         }
         return true
     }
+}
 
-    nonisolated private static func fileURL(from item: NSSecureCoding?) -> URL? {
-        if let url = item as? URL {
-            return url
+private final class DropURLCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedURLs: [URL] = []
+
+    var urls: [URL] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedURLs
+    }
+
+    func append(_ url: URL) {
+        lock.lock()
+        storedURLs.append(url)
+        lock.unlock()
+    }
+}
+
+private extension FolderCardColor {
+    var label: String {
+        switch self {
+        case .graphite:
+            return "Graphite"
+        case .blue:
+            return "Blue"
+        case .green:
+            return "Green"
+        case .amber:
+            return "Amber"
+        case .rose:
+            return "Rose"
+        case .violet:
+            return "Violet"
         }
-        if let url = item as? NSURL {
-            return url as URL
+    }
+
+    var accentColor: Color {
+        switch self {
+        case .graphite:
+            return Color.white.opacity(0.34)
+        case .blue:
+            return Color(red: 0.30, green: 0.58, blue: 0.95)
+        case .green:
+            return Color(red: 0.24, green: 0.66, blue: 0.46)
+        case .amber:
+            return Color(red: 0.86, green: 0.56, blue: 0.24)
+        case .rose:
+            return Color(red: 0.78, green: 0.36, blue: 0.50)
+        case .violet:
+            return Color(red: 0.56, green: 0.48, blue: 0.86)
         }
-        if let data = item as? Data,
-           let string = String(data: data, encoding: .utf8) {
-            return URL(string: string)
+    }
+
+    var backgroundColor: Color {
+        switch self {
+        case .graphite:
+            return Color(red: 0.15, green: 0.16, blue: 0.18)
+        case .blue:
+            return Color(red: 0.12, green: 0.17, blue: 0.24)
+        case .green:
+            return Color(red: 0.12, green: 0.20, blue: 0.17)
+        case .amber:
+            return Color(red: 0.23, green: 0.18, blue: 0.12)
+        case .rose:
+            return Color(red: 0.23, green: 0.14, blue: 0.17)
+        case .violet:
+            return Color(red: 0.17, green: 0.15, blue: 0.24)
         }
-        return nil
+    }
+
+    var lockedBackgroundColor: Color {
+        backgroundColor.opacity(0.88)
     }
 }

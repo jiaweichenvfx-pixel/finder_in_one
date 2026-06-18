@@ -62,11 +62,39 @@ final class WorkspaceViewModelTransferTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.targetDirectory.appendingPathComponent("Texture.tx").path))
         XCTAssertEqual(viewModel.itemsByCardID[fixture.targetCard.id]?.map(\.name), ["Texture.tx"])
     }
+
+    func testTransferExternalDraggedItemsIntoTargetCardWithoutInjectedAllowedRoot() throws {
+        let fixture = try WorkspaceViewModelTransferFixture()
+        defer { fixture.cleanUp() }
+        let firstURL = try fixture.createExternalFile(named: "DesktopRef.mov", contents: "ref")
+        let secondURL = try fixture.createExternalFile(named: "DesktopNotes.txt", contents: "notes")
+        try fixture.saveWorkspace()
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+        let draggedItems = [firstURL, secondURL].map { url in
+            FileItem(
+                url: url,
+                name: url.lastPathComponent,
+                modifiedAt: nil,
+                byteSize: nil,
+                isDirectory: false
+            )
+        }
+
+        let transferred = viewModel.transfer(items: draggedItems, to: fixture.targetCard)
+
+        XCTAssertTrue(transferred)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: firstURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: secondURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.targetDirectory.appendingPathComponent("DesktopRef.mov").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.targetDirectory.appendingPathComponent("DesktopNotes.txt").path))
+        XCTAssertEqual(viewModel.itemsByCardID[fixture.targetCard.id]?.map(\.name).sorted(), ["DesktopNotes.txt", "DesktopRef.mov"])
+    }
 }
 
 private struct WorkspaceViewModelTransferFixture {
     let root: URL
     let allowedRoot: URL
+    let externalDirectory: URL
     let sourceDirectory: URL
     let targetDirectory: URL
     let store: WorkspaceStore
@@ -78,6 +106,7 @@ private struct WorkspaceViewModelTransferFixture {
             .appendingPathComponent(".finder-workbench-demo-folders-test", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         allowedRoot = root.appendingPathComponent("Allowed", isDirectory: true)
+        externalDirectory = root.appendingPathComponent("External", isDirectory: true)
         sourceDirectory = allowedRoot.appendingPathComponent("Source", isDirectory: true)
         targetDirectory = allowedRoot.appendingPathComponent("Target", isDirectory: true)
         store = WorkspaceStore(fileURL: root.appendingPathComponent("workspace.json"))
@@ -94,11 +123,19 @@ private struct WorkspaceViewModelTransferFixture {
 
         try FileManager.default.createDirectory(at: sourceDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: targetDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: externalDirectory, withIntermediateDirectories: true)
     }
 
     @discardableResult
     func createSourceFile(named name: String, contents: String) throws -> URL {
         let url = sourceDirectory.appendingPathComponent(name)
+        try contents.write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
+
+    @discardableResult
+    func createExternalFile(named name: String, contents: String) throws -> URL {
+        let url = externalDirectory.appendingPathComponent(name)
         try contents.write(to: url, atomically: true, encoding: .utf8)
         return url
     }

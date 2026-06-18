@@ -14,12 +14,7 @@ public struct DirectoryListingService: @unchecked Sendable {
             options: [.skipsHiddenFiles]
         )
 
-        return try urls.map(makeItem(url:)).sorted { lhs, rhs in
-            if lhs.isDirectory != rhs.isDirectory {
-                return lhs.isDirectory && !rhs.isDirectory
-            }
-            return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
-        }
+        return FileItemSorter.sorted(try urls.map(makeItem(url:)))
     }
 
     private func makeItem(url: URL) throws -> FileItem {
