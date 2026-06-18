@@ -75,6 +75,26 @@ final class WorkspaceViewModelLayoutTests: XCTestCase {
         XCTAssertEqual(try fixture.store.load().cards.first?.frame.y, 80)
     }
 
+    func testLiveMoveUpdatesWorkspaceWithoutPersistingUntilCommit() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
+        defer { fixture.cleanUp() }
+        try fixture.saveWorkspace()
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+
+        let liveMoved = viewModel.moveCard(id: fixture.card.id, x: 120, y: 80, persist: false)
+
+        XCTAssertTrue(liveMoved)
+        XCTAssertEqual(viewModel.workspace.cards.first?.frame.x, 120)
+        XCTAssertEqual(viewModel.workspace.cards.first?.frame.y, 80)
+        XCTAssertEqual(try fixture.store.load().cards.first?.frame, fixture.card.frame)
+
+        let committed = viewModel.moveCard(id: fixture.card.id, x: 160, y: 100, persist: true)
+
+        XCTAssertTrue(committed)
+        XCTAssertEqual(try fixture.store.load().cards.first?.frame.x, 160)
+        XCTAssertEqual(try fixture.store.load().cards.first?.frame.y, 100)
+    }
+
     func testMoveLockedCardToPositionReturnsFalseAndKeepsFrame() throws {
         let fixture = try WorkspaceViewModelLayoutFixture(isLocked: true)
         defer { fixture.cleanUp() }
@@ -86,6 +106,39 @@ final class WorkspaceViewModelLayoutTests: XCTestCase {
         XCTAssertFalse(moved)
         XCTAssertEqual(viewModel.workspace.cards.first?.frame, fixture.card.frame)
         XCTAssertEqual(try fixture.store.load().cards.first?.frame, fixture.card.frame)
+    }
+
+    func testLiveResizeUpdatesWorkspaceWithoutPersistingUntilCommit() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
+        defer { fixture.cleanUp() }
+        try fixture.saveWorkspace()
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+
+        let liveResized = viewModel.resizeCard(id: fixture.card.id, width: 420, height: 360, persist: false)
+
+        XCTAssertTrue(liveResized)
+        XCTAssertEqual(viewModel.workspace.cards.first?.frame.width, 420)
+        XCTAssertEqual(viewModel.workspace.cards.first?.frame.height, 360)
+        XCTAssertEqual(try fixture.store.load().cards.first?.frame, fixture.card.frame)
+
+        let committed = viewModel.resizeCard(id: fixture.card.id, width: 440, height: 380, persist: true)
+
+        XCTAssertTrue(committed)
+        XCTAssertEqual(try fixture.store.load().cards.first?.frame.width, 440)
+        XCTAssertEqual(try fixture.store.load().cards.first?.frame.height, 380)
+    }
+
+    func testSelectionStateSupportsMultipleItemsPerCard() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
+        defer { fixture.cleanUp() }
+        try fixture.saveWorkspace()
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+        let firstURL = fixture.folderURL.appendingPathComponent("first.txt")
+        let secondURL = fixture.folderURL.appendingPathComponent("second.txt")
+
+        viewModel.setSelectedItemURLs([firstURL, secondURL], for: fixture.card.id)
+
+        XCTAssertEqual(viewModel.selectedItemURLsByCardID[fixture.card.id], [firstURL, secondURL])
     }
 
     func testAddFolderURLCreatesCardRefreshesAndPersists() throws {

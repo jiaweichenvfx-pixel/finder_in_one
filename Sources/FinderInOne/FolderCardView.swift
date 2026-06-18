@@ -11,10 +11,12 @@ struct FolderCardView: View {
     let onClose: () -> Void
     let onMoveEarlier: () -> Void
     let onMoveLater: () -> Void
-    let onDropFile: (URL) -> Bool
+    let selectedItemURLs: Set<URL>
+    let onSelectionChange: (Set<URL>) -> Void
+    let onDropFiles: ([URL]) -> Bool
     let onOpenItem: (FileItem) -> Void
-    let onMoveTo: (Double, Double) -> Void
-    let onResize: (Double, Double) -> Void
+    let onMoveTo: (Double, Double, Bool) -> Void
+    let onResize: (Double, Double, Bool) -> Void
 
     @State private var isDropTargeted = false
     @State private var moveStartFrame: CardFrame?
@@ -107,33 +109,13 @@ struct FolderCardView: View {
     }
 
     private var fileRows: some View {
-        ScrollView {
-            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
-                GridRow {
-                    Text("Name").bold()
-                    Text("Modified").bold()
-                    Text("Size").bold()
-                    Text("Kind").bold()
-                }
-                ForEach(items.prefix(100)) { item in
-                    GridRow {
-                        Text(item.name).lineLimit(1)
-                        Text(Self.dateFormatter.string(from: item.modifiedAt ?? .distantPast))
-                        Text(item.byteSize.map(Self.byteFormatter.string(fromByteCount:)) ?? "--")
-                        Text(item.kind)
-                    }
-                    .foregroundStyle(.white.opacity(0.82))
-                    .onDrag {
-                        NSItemProvider(object: item.url as NSURL)
-                    }
-                    .onTapGesture(count: 2) {
-                        onOpenItem(item)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .font(.system(size: 12, design: .monospaced))
+        FolderItemsTableView(
+            items: items,
+            selectedItemURLs: selectedItemURLs,
+            onSelectionChange: onSelectionChange,
+            onOpenItem: onOpenItem,
+            onDropURLs: onDropFiles
+        )
     }
 
     private var moveGesture: some Gesture {
@@ -143,10 +125,17 @@ struct FolderCardView: View {
                 moveStartFrame = startFrame
                 onMoveTo(
                     startFrame.x + value.translation.width,
-                    startFrame.y + value.translation.height
+                    startFrame.y + value.translation.height,
+                    false
                 )
             }
-            .onEnded { _ in
+            .onEnded { value in
+                let startFrame = moveStartFrame ?? card.frame
+                onMoveTo(
+                    startFrame.x + value.translation.width,
+                    startFrame.y + value.translation.height,
+                    true
+                )
                 moveStartFrame = nil
             }
     }
@@ -166,10 +155,17 @@ struct FolderCardView: View {
                             resizeStartFrame = startFrame
                             onResize(
                                 startFrame.width + value.translation.width,
-                                startFrame.height + value.translation.height
+                                startFrame.height + value.translation.height,
+                                false
                             )
                         }
-                        .onEnded { _ in
+                        .onEnded { value in
+                            let startFrame = resizeStartFrame ?? card.frame
+                            onResize(
+                                startFrame.width + value.translation.width,
+                                startFrame.height + value.translation.height,
+                                true
+                            )
                             resizeStartFrame = nil
                         }
                 )
@@ -200,7 +196,7 @@ struct FolderCardView: View {
                 return
             }
             DispatchQueue.main.async {
-                _ = onDropFile(url)
+                _ = onDropFiles([url])
             }
         }
         return true
@@ -219,13 +215,4 @@ struct FolderCardView: View {
         }
         return nil
     }
-
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .none
-        return formatter
-    }()
-
-    private static let byteFormatter = ByteCountFormatter()
 }

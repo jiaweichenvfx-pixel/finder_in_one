@@ -15,6 +15,7 @@ final class WorkspaceViewModel {
     var transferMode: TransferMode = .copy
     var itemsByCardID: [UUID: [FileItem]] = [:]
     var errorsByCardID: [UUID: String] = [:]
+    var selectedItemURLsByCardID: [UUID: Set<URL>] = [:]
 
     private let store: WorkspaceStore
     private let listingService: DirectoryListingService
@@ -93,11 +94,12 @@ final class WorkspaceViewModel {
         }
         itemsByCardID[id] = nil
         errorsByCardID[id] = nil
+        selectedItemURLsByCardID[id] = nil
         save()
     }
 
     @discardableResult
-    func resizeCard(id: UUID, width: Double, height: Double) -> Bool {
+    func resizeCard(id: UUID, width: Double, height: Double, persist: Bool = true) -> Bool {
         guard var card = workspace.cards.first(where: { $0.id == id }) else {
             return false
         }
@@ -105,7 +107,9 @@ final class WorkspaceViewModel {
             return false
         }
         workspace.updateCard(card)
-        save()
+        if persist {
+            save()
+        }
         return true
     }
 
@@ -122,7 +126,7 @@ final class WorkspaceViewModel {
     }
 
     @discardableResult
-    func moveCard(id: UUID, x: Double, y: Double) -> Bool {
+    func moveCard(id: UUID, x: Double, y: Double, persist: Bool = true) -> Bool {
         guard var card = workspace.cards.first(where: { $0.id == id }) else {
             return false
         }
@@ -130,8 +134,14 @@ final class WorkspaceViewModel {
             return false
         }
         workspace.updateCard(card)
-        save()
+        if persist {
+            save()
+        }
         return true
+    }
+
+    func setSelectedItemURLs(_ urls: Set<URL>, for cardID: UUID) {
+        selectedItemURLsByCardID[cardID] = urls
     }
 
     func openInFinder(card: FolderCard) {
@@ -150,6 +160,7 @@ final class WorkspaceViewModel {
         currentCard.folderPath = item.url.path
         currentCard.displayName = item.name
         workspace.updateCard(currentCard)
+        selectedItemURLsByCardID[card.id] = []
         refresh(card: currentCard)
         save()
         return .navigated
@@ -157,6 +168,15 @@ final class WorkspaceViewModel {
 
     @discardableResult
     func transfer(item: FileItem, to targetCard: FolderCard) -> Bool {
+        transfer(items: [item], to: targetCard)
+    }
+
+    @discardableResult
+    func transfer(items: [FileItem], to targetCard: FolderCard) -> Bool {
+        guard !items.isEmpty else {
+            return false
+        }
+
         let operation = currentTransferOperation
         defer {
             if transferMode == .moveOnce {
@@ -170,20 +190,28 @@ final class WorkspaceViewModel {
             return false
         }
 
-        do {
-            _ = try ScopedFileTransferService(allowedRoots: transferRoots).transfer(
-                sourceURL: item.url,
-                targetDirectory: targetCard.folderURL,
-                operation: operation,
-                conflictPolicy: .keepBoth
-            )
-            refreshImpactedCards(for: item, targetCard: targetCard)
-            errorsByCardID[targetCard.id] = nil
-            return true
-        } catch {
-            errorsByCardID[targetCard.id] = "Transfer failed"
-            return false
+        let transferService = ScopedFileTransferService(allowedRoots: transferRoots)
+        var didTransferAllItems = true
+        for item in items {
+            do {
+                _ = try transferService.transfer(
+                    sourceURL: item.url,
+                    targetDirectory: targetCard.folderURL,
+                    operation: operation,
+                    conflictPolicy: .keepBoth
+                )
+                refreshImpactedCards(for: item, targetCard: targetCard)
+            } catch {
+                didTransferAllItems = false
+            }
         }
+
+        if didTransferAllItems {
+            errorsByCardID[targetCard.id] = nil
+        } else {
+            errorsByCardID[targetCard.id] = "Transfer failed"
+        }
+        return didTransferAllItems
     }
 
     func refresh(card: FolderCard) {

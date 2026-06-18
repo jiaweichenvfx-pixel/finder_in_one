@@ -30,17 +30,21 @@ struct WorkspaceView: View {
             onClose: { viewModel.closeCard(id: card.id) },
             onMoveEarlier: { viewModel.moveCard(id: card.id, offset: -1) },
             onMoveLater: { viewModel.moveCard(id: card.id, offset: 1) },
-            onDropFile: { url in
-                viewModel.transfer(item: fileItem(for: url), to: card)
+            selectedItemURLs: viewModel.selectedItemURLsByCardID[card.id] ?? [],
+            onSelectionChange: { urls in
+                viewModel.setSelectedItemURLs(urls, for: card.id)
+            },
+            onDropFiles: { urls in
+                viewModel.transfer(items: urls.map(fileItem(for:)), to: card)
             },
             onOpenItem: { item in
                 viewModel.open(item: item, in: card)
             },
-            onMoveTo: { x, y in
-                viewModel.moveCard(id: card.id, x: x, y: y)
+            onMoveTo: { x, y, persist in
+                viewModel.moveCard(id: card.id, x: x, y: y, persist: persist)
             },
-            onResize: { width, height in
-                viewModel.resizeCard(id: card.id, width: width, height: height)
+            onResize: { width, height, persist in
+                viewModel.resizeCard(id: card.id, width: width, height: height, persist: persist)
             }
         )
         .frame(width: card.frame.width, height: card.frame.height)
