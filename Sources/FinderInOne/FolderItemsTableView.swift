@@ -111,6 +111,14 @@ struct FolderItemsTableView: NSViewRepresentable {
             }
 
             let identifier = tableColumn.identifier
+            if identifier.rawValue == "name" {
+                let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? FinderNameCellView
+                    ?? FinderNameCellView()
+                cell.identifier = identifier
+                cell.configure(with: parent.items[row])
+                return cell
+            }
+
             let textField = tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTextField
                 ?? NSTextField(labelWithString: "")
             textField.identifier = identifier
@@ -242,6 +250,69 @@ struct FolderItemsTableView: NSViewRepresentable {
         }()
 
         private static let byteFormatter = ByteCountFormatter()
+    }
+}
+
+@MainActor
+private final class FinderNameCellView: NSTableCellView {
+    private let iconView = NSImageView()
+    private let nameField = NSTextField(labelWithString: "")
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setup()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setup()
+    }
+
+    func configure(with item: FileItem) {
+        iconView.image = NSImage(
+            systemSymbolName: item.isDirectory ? "folder.fill" : "doc",
+            accessibilityDescription: item.isDirectory ? "Folder" : "File"
+        )
+        iconView.contentTintColor = item.isDirectory
+            ? NSColor.systemBlue.withAlphaComponent(0.92)
+            : NSColor.white.withAlphaComponent(0.58)
+        nameField.stringValue = item.name
+        nameField.font = item.isDirectory
+            ? .systemFont(ofSize: 12, weight: .medium)
+            : .systemFont(ofSize: 12)
+        nameField.textColor = item.isDirectory
+            ? .white.withAlphaComponent(0.96)
+            : .white.withAlphaComponent(0.86)
+    }
+
+    private func setup() {
+        guard subviews.isEmpty else {
+            return
+        }
+
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        iconView.imageScaling = .scaleProportionallyDown
+
+        nameField.translatesAutoresizingMaskIntoConstraints = false
+        nameField.lineBreakMode = .byTruncatingMiddle
+        nameField.maximumNumberOfLines = 1
+        nameField.backgroundColor = .clear
+
+        addSubview(iconView)
+        addSubview(nameField)
+        imageView = iconView
+        textField = nameField
+
+        NSLayoutConstraint.activate([
+            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
+            iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            iconView.widthAnchor.constraint(equalToConstant: 16),
+            iconView.heightAnchor.constraint(equalToConstant: 16),
+            nameField.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 6),
+            nameField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            nameField.centerYAnchor.constraint(equalTo: centerYAnchor)
+        ])
     }
 }
 
