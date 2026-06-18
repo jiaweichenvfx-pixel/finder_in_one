@@ -40,6 +40,45 @@ final class WorkspaceViewModelOpenItemTests: XCTestCase {
         XCTAssertEqual(openedURLs, [fileURL])
         XCTAssertEqual(viewModel.workspace.cards.first?.folderPath, fixture.folderURL.path)
     }
+
+    func testNavigateToParentFolderUpdatesCardRefreshesAndPersists() throws {
+        let fixture = try WorkspaceViewModelOpenItemFixture()
+        defer { fixture.cleanUp() }
+        let childFolder = try fixture.createFolder(named: "Shots")
+        try "plate".write(to: fixture.folderURL.appendingPathComponent("root.txt"), atomically: true, encoding: .utf8)
+        try "plate".write(to: childFolder.appendingPathComponent("plate.mov"), atomically: true, encoding: .utf8)
+        var childCard = fixture.card
+        childCard.displayName = "Shots"
+        childCard.folderPath = childFolder.path
+        try fixture.store.save(Workspace(cards: [childCard]))
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+
+        let navigated = viewModel.navigateToParent(of: childCard)
+
+        XCTAssertTrue(navigated)
+        XCTAssertEqual(viewModel.workspace.cards.first?.folderPath, fixture.folderURL.path)
+        XCTAssertEqual(viewModel.workspace.cards.first?.displayName, "Card")
+        XCTAssertEqual(viewModel.itemsByCardID[fixture.card.id]?.map(\.name), ["Shots", "root.txt"])
+        XCTAssertEqual(try fixture.store.load().cards.first?.folderPath, fixture.folderURL.path)
+    }
+
+    func testPreviewItemsSendsURLsToPreviewer() throws {
+        let fixture = try WorkspaceViewModelOpenItemFixture()
+        defer { fixture.cleanUp() }
+        let firstURL = try fixture.createFile(named: "first.jpg", contents: "image")
+        let secondURL = try fixture.createFile(named: "second.jpg", contents: "image")
+        try fixture.saveWorkspace()
+        var previewedURLs: [URL] = []
+        let viewModel = WorkspaceViewModel(
+            store: fixture.store,
+            filePreviewing: FilePreviewing { previewedURLs = $0 }
+        )
+        let items = try XCTUnwrap(viewModel.itemsByCardID[fixture.card.id])
+
+        viewModel.preview(items: items)
+
+        XCTAssertEqual(previewedURLs, [firstURL, secondURL])
+    }
 }
 
 private struct WorkspaceViewModelOpenItemFixture {

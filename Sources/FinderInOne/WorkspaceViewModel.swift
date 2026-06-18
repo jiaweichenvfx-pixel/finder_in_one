@@ -22,6 +22,7 @@ final class WorkspaceViewModel {
     private let demoFolderProvider: DemoFolderProvider
     private let finderOpening: FinderOpening
     private let fileOpening: FileOpening
+    private let filePreviewing: FilePreviewing
     private let allowedTransferRoot: URL?
 
     init(
@@ -30,6 +31,7 @@ final class WorkspaceViewModel {
         demoFolderProvider: DemoFolderProvider = DemoFolderProvider(),
         finderOpening: FinderOpening = FinderOpening(),
         fileOpening: FileOpening = FileOpening(),
+        filePreviewing: FilePreviewing = FilePreviewing(),
         allowedTransferRoot: URL? = nil
     ) {
         self.store = store
@@ -37,6 +39,7 @@ final class WorkspaceViewModel {
         self.demoFolderProvider = demoFolderProvider
         self.finderOpening = finderOpening
         self.fileOpening = fileOpening
+        self.filePreviewing = filePreviewing
         self.allowedTransferRoot = allowedTransferRoot
         self.workspace = (try? store.load()) ?? Workspace()
         refreshAllCards()
@@ -157,13 +160,32 @@ final class WorkspaceViewModel {
         guard var currentCard = workspace.cards.first(where: { $0.id == card.id }) else {
             return .failed
         }
-        currentCard.folderPath = item.url.path
-        currentCard.displayName = item.name
-        workspace.updateCard(currentCard)
-        selectedItemURLsByCardID[card.id] = []
-        refresh(card: currentCard)
-        save()
+        navigate(card: &currentCard, to: item.url)
         return .navigated
+    }
+
+    @discardableResult
+    func navigateToParent(of card: FolderCard) -> Bool {
+        guard var currentCard = workspace.cards.first(where: { $0.id == card.id }) else {
+            return false
+        }
+
+        let currentURL = currentCard.folderURL.standardizedFileURL
+        let parentURL = currentURL.deletingLastPathComponent()
+        guard parentURL.path != currentURL.path else {
+            return false
+        }
+
+        navigate(card: &currentCard, to: parentURL)
+        return true
+    }
+
+    func preview(items: [FileItem]) {
+        let urls = items.map(\.url)
+        guard !urls.isEmpty else {
+            return
+        }
+        filePreviewing.preview(urls)
     }
 
     @discardableResult
@@ -232,6 +254,15 @@ final class WorkspaceViewModel {
 
     private func save() {
         try? store.save(workspace)
+    }
+
+    private func navigate(card: inout FolderCard, to url: URL) {
+        card.folderPath = url.path
+        card.displayName = url.lastPathComponent.isEmpty ? url.path : url.lastPathComponent
+        workspace.updateCard(card)
+        selectedItemURLsByCardID[card.id] = []
+        refresh(card: card)
+        save()
     }
 
     private func bookmarkData(for url: URL) -> Data? {

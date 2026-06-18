@@ -7,6 +7,7 @@ struct FolderCardView: View {
     let items: [FileItem]
     let errorMessage: String?
     let onToggleLock: () -> Void
+    let onNavigateUp: () -> Void
     let onOpenInFinder: () -> Void
     let onClose: () -> Void
     let onMoveEarlier: () -> Void
@@ -15,6 +16,7 @@ struct FolderCardView: View {
     let onSelectionChange: (Set<URL>) -> Void
     let onDropFiles: ([URL]) -> Bool
     let onOpenItem: (FileItem) -> Void
+    let onPreviewItems: ([FileItem]) -> Void
     let onMoveTo: (Double, Double, Bool) -> Void
     let onResize: (Double, Double, Bool) -> Void
 
@@ -76,6 +78,10 @@ struct FolderCardView: View {
                     }
                     .help("Move later")
                 }
+                Button(action: onNavigateUp) {
+                    Image(systemName: "arrow.up")
+                }
+                .help("Parent folder")
                 Button(card.isLocked ? "Unlock" : "Lock", action: onToggleLock)
                 Button("Finder", action: onOpenInFinder)
                 if card.canClose {
@@ -114,6 +120,7 @@ struct FolderCardView: View {
             selectedItemURLs: selectedItemURLs,
             onSelectionChange: onSelectionChange,
             onOpenItem: onOpenItem,
+            onPreviewItems: onPreviewItems,
             onDropURLs: onDropFiles
         )
     }

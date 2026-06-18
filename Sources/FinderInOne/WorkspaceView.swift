@@ -26,6 +26,7 @@ struct WorkspaceView: View {
             items: viewModel.itemsByCardID[card.id] ?? [],
             errorMessage: viewModel.errorsByCardID[card.id],
             onToggleLock: { viewModel.toggleLock(for: card.id) },
+            onNavigateUp: { viewModel.navigateToParent(of: card) },
             onOpenInFinder: { viewModel.openInFinder(card: card) },
             onClose: { viewModel.closeCard(id: card.id) },
             onMoveEarlier: { viewModel.moveCard(id: card.id, offset: -1) },
@@ -39,6 +40,9 @@ struct WorkspaceView: View {
             },
             onOpenItem: { item in
                 viewModel.open(item: item, in: card)
+            },
+            onPreviewItems: { items in
+                viewModel.preview(items: items)
             },
             onMoveTo: { x, y, persist in
                 viewModel.moveCard(id: card.id, x: x, y: y, persist: persist)

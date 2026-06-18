@@ -9,10 +9,12 @@ struct FolderItemsTableView: NSViewRepresentable {
     let selectedItemURLs: Set<URL>
     let onSelectionChange: (Set<URL>) -> Void
     let onOpenItem: (FileItem) -> Void
+    let onPreviewItems: ([FileItem]) -> Void
     let onDropURLs: ([URL]) -> Bool
 
     func makeNSView(context: Context) -> NSScrollView {
-        let tableView = NSTableView()
+        let tableView = FinderTableView()
+        tableView.coordinator = context.coordinator
         tableView.style = .plain
         tableView.backgroundColor = .clear
         tableView.usesAlternatingRowBackgroundColors = false
@@ -49,10 +51,25 @@ struct FolderItemsTableView: NSViewRepresentable {
         }
 
         context.coordinator.parent = self
-        context.coordinator.isApplyingSelection = true
-        tableView.reloadData()
-        tableView.selectRowIndexes(selectedRows(), byExtendingSelection: false)
-        context.coordinator.isApplyingSelection = false
+        if let tableView = tableView as? FinderTableView {
+            tableView.coordinator = context.coordinator
+        }
+
+        let itemFingerprint = items
+        let selection = selectedRows()
+        let shouldReload = context.coordinator.lastItemFingerprint != itemFingerprint
+        let shouldSelect = shouldReload || context.coordinator.lastSelectedItemURLs != selectedItemURLs
+
+        if shouldReload {
+            tableView.reloadData()
+            context.coordinator.lastItemFingerprint = itemFingerprint
+        }
+        if shouldSelect {
+            context.coordinator.isApplyingSelection = true
+            tableView.selectRowIndexes(selection, byExtendingSelection: false)
+            context.coordinator.isApplyingSelection = false
+            context.coordinator.lastSelectedItemURLs = selectedItemURLs
+        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -66,6 +83,7 @@ struct FolderItemsTableView: NSViewRepresentable {
     private func addColumn(_ identifier: String, title: String, width: CGFloat, to tableView: NSTableView) {
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
         column.title = title
+        column.headerCell = FinderTableHeaderCell(textCell: title)
         column.width = width
         column.minWidth = 54
         column.resizingMask = .userResizingMask
@@ -76,6 +94,8 @@ struct FolderItemsTableView: NSViewRepresentable {
     final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         var parent: FolderItemsTableView
         var isApplyingSelection = false
+        var lastItemFingerprint: [FileItem] = []
+        var lastSelectedItemURLs: Set<URL> = []
 
         init(_ parent: FolderItemsTableView) {
             self.parent = parent
@@ -162,6 +182,23 @@ struct FolderItemsTableView: NSViewRepresentable {
             parent.onOpenItem(parent.items[sender.clickedRow])
         }
 
+        func previewSelection(in tableView: NSTableView) {
+            let selectedItems = tableView.selectedRowIndexes.compactMap { row -> FileItem? in
+                guard row < parent.items.count else {
+                    return nil
+                }
+                return parent.items[row]
+            }
+
+            if selectedItems.isEmpty,
+               tableView.clickedRow >= 0,
+               tableView.clickedRow < parent.items.count {
+                parent.onPreviewItems([parent.items[tableView.clickedRow]])
+            } else {
+                parent.onPreviewItems(selectedItems)
+            }
+        }
+
         private func value(for item: FileItem, column: String) -> String {
             switch column {
             case "name":
@@ -205,6 +242,39 @@ struct FolderItemsTableView: NSViewRepresentable {
         }()
 
         private static let byteFormatter = ByteCountFormatter()
+    }
+}
+
+@MainActor
+private final class FinderTableView: NSTableView {
+    weak var coordinator: FolderItemsTableView.Coordinator?
+
+    override func keyDown(with event: NSEvent) {
+        if event.charactersIgnoringModifiers == " " {
+            coordinator?.previewSelection(in: self)
+            return
+        }
+        super.keyDown(with: event)
+    }
+}
+
+private final class FinderTableHeaderCell: NSTableHeaderCell {
+    override func draw(withFrame cellFrame: NSRect, in controlView: NSView) {
+        NSColor(red: 0.23, green: 0.24, blue: 0.26, alpha: 1).setFill()
+        cellFrame.fill()
+        super.drawInterior(withFrame: cellFrame.insetBy(dx: 6, dy: 0), in: controlView)
+    }
+
+    override func drawInterior(withFrame cellFrame: NSRect, in controlView: NSView) {
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineBreakMode = .byTruncatingTail
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 11, weight: .medium),
+            .foregroundColor: NSColor.white.withAlphaComponent(0.66),
+            .paragraphStyle: paragraphStyle
+        ]
+        let attributedTitle = NSAttributedString(string: stringValue, attributes: attributes)
+        attributedTitle.draw(in: cellFrame.insetBy(dx: 6, dy: 3))
     }
 }
 
