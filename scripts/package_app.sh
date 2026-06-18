@@ -7,20 +7,31 @@ VERSION="0.1.0"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-BUILD_DIR="${REPO_ROOT}/.build/release"
+ARM64_BUILD_DIR="${REPO_ROOT}/.build/arm64-apple-macosx/release"
+X86_64_BUILD_DIR="${REPO_ROOT}/.build/x86_64-apple-macosx/release"
 DIST_DIR="${REPO_ROOT}/dist"
 APP_BUNDLE="${DIST_DIR}/${APP_NAME}.app"
 CONTENTS_DIR="${APP_BUNDLE}/Contents"
 MACOS_DIR="${CONTENTS_DIR}/MacOS"
+RESOURCES_DIR="${CONTENTS_DIR}/Resources"
+ICONSET_DIR="${DIST_DIR}/AppIcon.iconset"
 
 cd "${REPO_ROOT}"
-swift build -c release --product "${APP_NAME}"
+swift build -c release --triple arm64-apple-macosx14.0 --product "${APP_NAME}"
+swift build -c release --triple x86_64-apple-macosx14.0 --product "${APP_NAME}"
 
 rm -rf "${APP_BUNDLE}"
-mkdir -p "${MACOS_DIR}"
+mkdir -p "${MACOS_DIR}" "${RESOURCES_DIR}"
 
-cp "${BUILD_DIR}/${APP_NAME}" "${MACOS_DIR}/${APP_NAME}"
+lipo -create \
+    "${ARM64_BUILD_DIR}/${APP_NAME}" \
+    "${X86_64_BUILD_DIR}/${APP_NAME}" \
+    -output "${MACOS_DIR}/${APP_NAME}"
 chmod 755 "${MACOS_DIR}/${APP_NAME}"
+
+swift "${REPO_ROOT}/scripts/make_app_icon.swift" "${ICONSET_DIR}"
+iconutil -c icns "${ICONSET_DIR}" -o "${RESOURCES_DIR}/AppIcon.icns"
+rm -rf "${ICONSET_DIR}"
 
 cat > "${CONTENTS_DIR}/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -35,6 +46,8 @@ cat > "${CONTENTS_DIR}/Info.plist" <<PLIST
     <string>${APP_NAME}</string>
     <key>CFBundleIdentifier</key>
     <string>${BUNDLE_ID}</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
