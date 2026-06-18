@@ -18,6 +18,7 @@ struct WorkspaceView: View {
             }
         }
         .background(Color(nsColor: .windowBackgroundColor))
+        .background(WindowDragEnabler())
     }
 
     private func cardView(for card: FolderCard) -> some View {

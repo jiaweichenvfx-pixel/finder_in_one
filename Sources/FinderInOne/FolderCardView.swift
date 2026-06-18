@@ -53,15 +53,7 @@ struct FolderCardView: View {
 
     private var header: some View {
         HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(card.displayName)
-                    .font(.headline)
-                Text(card.folderPath)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            Spacer()
+            titleArea
             HStack(spacing: 4) {
                 if card.canMove {
                     Image(systemName: "line.3.horizontal")
@@ -87,6 +79,28 @@ struct FolderCardView: View {
                 }
             }
             .font(.system(size: 11))
+        }
+    }
+
+    @ViewBuilder
+    private var titleArea: some View {
+        let content = VStack(alignment: .leading, spacing: 2) {
+            Text(card.displayName)
+                .font(.headline)
+            Text(card.folderPath)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+
+        if card.canMove {
+            content
+                .contentShape(Rectangle())
+                .gesture(moveGesture)
+                .help("Drag card")
+        } else {
+            content
         }
     }
 
