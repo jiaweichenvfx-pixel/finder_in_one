@@ -80,7 +80,7 @@ struct WorkspaceView: View {
     private func cardView(for card: FolderCard) -> some View {
         FolderCardView(
             card: card,
-            items: viewModel.itemsByCardID[card.id] ?? [],
+            items: viewModel.displayedItems(for: card),
             errorMessage: viewModel.errorsByCardID[card.id],
             onToggleLock: { viewModel.toggleLock(for: card.id) },
             onToggleCollapse: { viewModel.toggleCollapse(for: card.id) },
@@ -89,9 +89,13 @@ struct WorkspaceView: View {
             onClose: { viewModel.closeCard(id: card.id) },
             onSetColor: { color in viewModel.setCardColor(color, for: card.id) },
             selectedItemURLs: viewModel.selectedItemURLsByCardID[card.id] ?? [],
+            suffixFilterText: viewModel.suffixFilterTextByCardID[card.id] ?? "",
             transferMode: viewModel.transferMode,
             onSelectionChange: { urls in
                 viewModel.setSelectedItemURLs(urls, for: card.id)
+            },
+            onSuffixFilterChange: { text in
+                viewModel.setSuffixFilter(text, for: card.id)
             },
             onDropFiles: { urls in
                 viewModel.transfer(items: urls.map(fileItem(for:)), to: card)

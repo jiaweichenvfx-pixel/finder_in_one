@@ -17,6 +17,7 @@ final class WorkspaceViewModel {
     var itemsByCardID: [UUID: [FileItem]] = [:]
     var errorsByCardID: [UUID: String] = [:]
     var selectedItemURLsByCardID: [UUID: Set<URL>] = [:]
+    var suffixFilterTextByCardID: [UUID: String] = [:]
     var templateSlots: [WorkspaceTemplateSlot] = []
     var activeTemplateIndex: Int?
     var focusedCardID: UUID?
@@ -182,6 +183,27 @@ final class WorkspaceViewModel {
 
     func setSelectedItemURLs(_ urls: Set<URL>, for cardID: UUID) {
         selectedItemURLsByCardID[cardID] = urls
+    }
+
+    func setSuffixFilter(_ text: String, for cardID: UUID) {
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedText.isEmpty {
+            suffixFilterTextByCardID[cardID] = nil
+        } else {
+            suffixFilterTextByCardID[cardID] = text
+        }
+    }
+
+    func displayedItems(for card: FolderCard) -> [FileItem] {
+        let items = itemsByCardID[card.id] ?? []
+        let suffixes = parsedSuffixes(for: card.id)
+        guard !suffixes.isEmpty else {
+            return items
+        }
+
+        return items.filter { item in
+            item.isDirectory || suffixes.contains(item.url.pathExtension.lowercased())
+        }
     }
 
     @discardableResult
@@ -391,6 +413,23 @@ final class WorkspaceViewModel {
 
     private func normalizedFolderPath(_ url: URL) -> String {
         URL(fileURLWithPath: url.path, isDirectory: true).standardizedFileURL.path
+    }
+
+    private func parsedSuffixes(for cardID: UUID) -> Set<String> {
+        guard let filterText = suffixFilterTextByCardID[cardID] else {
+            return []
+        }
+
+        let suffixes = filterText
+            .split { character in
+                character == "," || character == " " || character == "\n" || character == "\t"
+            }
+            .map { suffix in
+                suffix.trimmingCharacters(in: CharacterSet(charactersIn: ".").union(.whitespacesAndNewlines)).lowercased()
+            }
+            .filter { !$0.isEmpty }
+
+        return Set(suffixes)
     }
 
     private func isDirectory(_ url: URL) -> Bool {

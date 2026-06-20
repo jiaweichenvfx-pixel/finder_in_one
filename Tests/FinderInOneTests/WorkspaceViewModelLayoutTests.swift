@@ -141,6 +141,37 @@ final class WorkspaceViewModelLayoutTests: XCTestCase {
         XCTAssertEqual(viewModel.selectedItemURLsByCardID[fixture.card.id], [firstURL, secondURL])
     }
 
+    func testSuffixFilterShowsOnlyMatchingFilesAndKeepsFoldersVisible() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
+        defer { fixture.cleanUp() }
+        try fixture.createFile(in: fixture.folderURL, named: "plate.mov", contents: "mov")
+        try fixture.createFile(in: fixture.folderURL, named: "notes.txt", contents: "txt")
+        try fixture.createFile(in: fixture.folderURL, named: "look.JPG", contents: "jpg")
+        try fixture.createFolder(in: fixture.folderURL, named: "Shots")
+        try fixture.saveWorkspace()
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+
+        viewModel.setSuffixFilter(".mov, jpg", for: fixture.card.id)
+
+        XCTAssertEqual(viewModel.suffixFilterTextByCardID[fixture.card.id], ".mov, jpg")
+        XCTAssertEqual(viewModel.displayedItems(for: fixture.card).map(\.name), ["Shots", "look.JPG", "plate.mov"])
+    }
+
+    func testEmptySuffixFilterShowsAllItems() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
+        defer { fixture.cleanUp() }
+        try fixture.createFile(in: fixture.folderURL, named: "plate.mov", contents: "mov")
+        try fixture.createFile(in: fixture.folderURL, named: "notes.txt", contents: "txt")
+        try fixture.saveWorkspace()
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+
+        viewModel.setSuffixFilter("mov", for: fixture.card.id)
+        viewModel.setSuffixFilter("", for: fixture.card.id)
+
+        XCTAssertNil(viewModel.suffixFilterTextByCardID[fixture.card.id])
+        XCTAssertEqual(viewModel.displayedItems(for: fixture.card).map(\.name), ["notes.txt", "plate.mov"])
+    }
+
     func testAddFolderURLCreatesCardRefreshesAndPersists() throws {
         let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
         defer { fixture.cleanUp() }
@@ -372,8 +403,22 @@ private struct WorkspaceViewModelLayoutFixture {
         return url
     }
 
+    @discardableResult
+    func createFolder(in directory: URL, named name: String) throws -> URL {
+        let url = directory.appendingPathComponent(name, isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
     func createFile(named name: String, contents: String) throws -> URL {
         let url = root.appendingPathComponent(name)
+        try contents.write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
+
+    @discardableResult
+    func createFile(in directory: URL, named name: String, contents: String) throws -> URL {
+        let url = directory.appendingPathComponent(name)
         try contents.write(to: url, atomically: true, encoding: .utf8)
         return url
     }

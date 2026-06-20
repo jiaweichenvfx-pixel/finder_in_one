@@ -13,8 +13,10 @@ struct FolderCardView: View {
     let onClose: () -> Void
     let onSetColor: (FolderCardColor) -> Void
     let selectedItemURLs: Set<URL>
+    let suffixFilterText: String
     let transferMode: TransferMode
     let onSelectionChange: (Set<URL>) -> Void
+    let onSuffixFilterChange: (String) -> Void
     let onDropFiles: ([URL]) -> Bool
     let onOpenItem: (FileItem) -> Void
     let onPreviewItems: ([FileItem], FileItem?) -> Void
@@ -33,6 +35,7 @@ struct FolderCardView: View {
             if !card.isCollapsed {
                 Divider()
                     .overlay(Color.white.opacity(0.18))
+                suffixFilterField
                 if let errorMessage {
                     Text(errorMessage)
                         .font(.caption)
@@ -141,6 +144,38 @@ struct FolderCardView: View {
             onPreviewItems: onPreviewItems,
             onDropURLs: onDropFiles
         )
+    }
+
+    private var suffixFilterField: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.white.opacity(0.52))
+            TextField("suffix: mov, jpg", text: Binding(
+                get: { suffixFilterText },
+                set: { newValue in
+                    onSuffixFilterChange(newValue)
+                }
+            ))
+            .textFieldStyle(.plain)
+            .font(.system(size: 11))
+            .foregroundStyle(.white.opacity(0.88))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(Color.black.opacity(0.18))
+            .clipShape(RoundedRectangle(cornerRadius: 5))
+            if !suffixFilterText.isEmpty {
+                Button {
+                    onSuffixFilterChange("")
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white.opacity(0.58))
+                .help("Clear suffix filter")
+            }
+        }
+        .help("Filter files by suffix. Folders stay visible.")
     }
 
     private var moveGesture: some Gesture {
