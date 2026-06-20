@@ -244,19 +244,27 @@ struct FolderCardView: View {
             .onChanged { value in
                 moveStartFrame = moveStartFrame ?? card.frame
                 isMoving = true
-                moveTranslation = value.translation
+                moveTranslation = worldTranslation(for: value.translation)
             }
             .onEnded { value in
                 let startFrame = moveStartFrame ?? card.frame
+                let translation = worldTranslation(for: value.translation)
                 onMoveTo(
-                    startFrame.x + value.translation.width,
-                    startFrame.y + value.translation.height,
+                    startFrame.x + translation.width,
+                    startFrame.y + translation.height,
                     true
                 )
                 moveTranslation = .zero
                 moveStartFrame = nil
                 isMoving = false
             }
+    }
+
+    private func worldTranslation(for screenTranslation: CGSize) -> CGSize {
+        CardDragMath.worldTranslation(
+            fromScreenTranslation: screenTranslation,
+            viewportScale: viewportScale
+        )
     }
 
     private var resizeHandle: some View {
