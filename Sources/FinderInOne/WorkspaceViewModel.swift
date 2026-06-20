@@ -157,6 +157,18 @@ final class WorkspaceViewModel {
         save()
     }
 
+    func clearCanvas() {
+        workspace.clearCards()
+        itemsByCardID.removeAll()
+        errorsByCardID.removeAll()
+        selectedItemURLsByCardID.removeAll()
+        suffixFilterTextByCardID.removeAll()
+        sortOrderByCardID.removeAll()
+        activeTemplateIndex = nil
+        focusedCardID = nil
+        save()
+    }
+
     @discardableResult
     func resizeCard(id: UUID, width: Double, height: Double, persist: Bool = true) -> Bool {
         guard var card = workspace.cards.first(where: { $0.id == id }) else {

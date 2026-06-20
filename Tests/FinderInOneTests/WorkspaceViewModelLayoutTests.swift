@@ -293,6 +293,29 @@ final class WorkspaceViewModelLayoutTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: childFolder.path))
     }
 
+    func testClearCanvasRemovesCardsAndStateWithoutDeletingFolders() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: true)
+        defer { fixture.cleanUp() }
+        let noteURL = try fixture.createFile(in: fixture.folderURL, named: "keep.txt", contents: "keep")
+        let secondCard = fixture.makeCard(displayName: "Second", isLocked: true)
+        try FileManager.default.createDirectory(at: secondCard.folderURL, withIntermediateDirectories: true)
+        try fixture.store.save(Workspace(cards: [fixture.card, secondCard]))
+        let viewModel = WorkspaceViewModel(store: fixture.store, templateStore: fixture.templateStore)
+        viewModel.setSelectedItemURLs([noteURL], for: fixture.card.id)
+        viewModel.setSuffixFilter("txt", for: fixture.card.id)
+
+        viewModel.clearCanvas()
+
+        XCTAssertTrue(viewModel.workspace.cards.isEmpty)
+        XCTAssertTrue(viewModel.itemsByCardID.isEmpty)
+        XCTAssertTrue(viewModel.selectedItemURLsByCardID.isEmpty)
+        XCTAssertTrue(viewModel.suffixFilterTextByCardID.isEmpty)
+        XCTAssertTrue(try fixture.store.load().cards.isEmpty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.folderURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: secondCard.folderURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: noteURL.path))
+    }
+
     func testTemplateOpenReplacesCurrentCanvasAndRefreshesCards() throws {
         let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
         defer { fixture.cleanUp() }

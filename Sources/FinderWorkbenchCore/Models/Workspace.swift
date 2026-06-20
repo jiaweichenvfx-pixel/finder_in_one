@@ -11,6 +11,10 @@ public struct Workspace: Codable, Equatable, Sendable {
         cards.append(card)
     }
 
+    public mutating func clearCards() {
+        cards.removeAll()
+    }
+
     @discardableResult
     public mutating func closeCard(id: UUID) -> Bool {
         guard let index = cards.firstIndex(where: { $0.id == id }) else {

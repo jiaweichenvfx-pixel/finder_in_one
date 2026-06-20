@@ -12,6 +12,7 @@ struct WorkspaceView: View {
     @State private var createFolderNameDraft = ""
     @State private var renamingItemCardID: UUID?
     @State private var renameItemNameDraft = ""
+    @State private var isClearCanvasConfirmationPresented = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -105,6 +106,15 @@ struct WorkspaceView: View {
                 }
                 renamingItemCardID = nil
             }
+        }
+        .alert("Clear Canvas", isPresented: $isClearCanvasConfirmationPresented) {
+            Button("Cancel", role: .cancel) {}
+            Button("Clear", role: .destructive) {
+                viewModel.clearCanvas()
+                viewport.reset()
+            }
+        } message: {
+            Text("Only folder cards will be removed. Files and folders stay untouched.")
         }
     }
 
@@ -239,6 +249,13 @@ struct WorkspaceView: View {
                 Image(systemName: "arrow.clockwise")
             }
             .help("Refresh folders")
+            Button {
+                isClearCanvasConfirmationPresented = true
+            } label: {
+                Image(systemName: "xmark.square")
+            }
+            .disabled(viewModel.workspace.cards.isEmpty)
+            .help("Clear canvas cards only")
             Button {
                 viewModel.pickAndAddFolder()
             } label: {
