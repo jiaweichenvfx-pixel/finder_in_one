@@ -240,9 +240,7 @@ struct WorkspaceView: View {
             }
             .help("Refresh folders")
             Button {
-                Task {
-                    await viewModel.pickAndAddFolder()
-                }
+                viewModel.pickAndAddFolder()
             } label: {
                 Image(systemName: "plus")
             }
@@ -301,6 +299,8 @@ struct WorkspaceView: View {
                 .help(templateHelp(for: slot))
             }
         }
+        .frame(maxWidth: 420, alignment: .leading)
+        .clipped()
     }
 
     private var renameTemplateBinding: Binding<Bool> {

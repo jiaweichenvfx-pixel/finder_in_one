@@ -3,7 +3,7 @@ import Foundation
 
 @MainActor
 struct FolderPicking {
-    func pickFolder() async -> URL? {
+    func pickFolder() -> URL? {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
@@ -11,7 +11,8 @@ struct FolderPicking {
         panel.canCreateDirectories = false
         panel.message = "Choose a folder to add to Finder in One"
 
-        let response = await panel.begin()
+        NSApp.activate(ignoringOtherApps: true)
+        let response = panel.runModal()
         guard response == .OK else {
             return nil
         }

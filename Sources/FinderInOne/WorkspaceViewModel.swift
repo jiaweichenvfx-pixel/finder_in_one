@@ -129,8 +129,8 @@ final class WorkspaceViewModel {
         return didAddFolder
     }
 
-    func pickAndAddFolder() async {
-        guard let url = await FolderPicking().pickFolder() else {
+    func pickAndAddFolder() {
+        guard let url = FolderPicking().pickFolder() else {
             return
         }
         addFolder(url: url)
