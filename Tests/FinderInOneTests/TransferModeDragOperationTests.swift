@@ -13,11 +13,19 @@ final class TransferModeDragOperationTests: XCTestCase {
         XCTAssertEqual(TransferMode.moveOnce.dragOperation, .move)
     }
 
+    func testDeleteModeAdvertisesDeleteDragOperation() {
+        XCTAssertEqual(TransferMode.delete.dragOperation, .delete)
+    }
+
     func testCopyModeAdvertisesCopyDropProposalOperation() {
         XCTAssertEqual(TransferMode.copy.dropProposalOperation, .copy)
     }
 
     func testMoveOnceModeAdvertisesMoveDropProposalOperation() {
         XCTAssertEqual(TransferMode.moveOnce.dropProposalOperation, .move)
+    }
+
+    func testDeleteModeAdvertisesDeleteDropProposalOperation() {
+        XCTAssertEqual(TransferMode.delete.dropProposalOperation, .move)
     }
 }

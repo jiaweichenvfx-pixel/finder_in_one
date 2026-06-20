@@ -89,6 +89,38 @@ final class WorkspaceViewModelTransferTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.targetDirectory.appendingPathComponent("DesktopNotes.txt").path))
         XCTAssertEqual(viewModel.itemsByCardID[fixture.targetCard.id]?.map(\.name).sorted(), ["DesktopNotes.txt", "DesktopRef.mov"])
     }
+
+    func testTrashDroppedItemsRemovesThemFromSourceCardAndReturnsToCopyMode() throws {
+        let fixture = try WorkspaceViewModelTransferFixture()
+        defer { fixture.cleanUp() }
+        let fileURL = try fixture.createSourceFile(named: "DeleteMe.txt", contents: "delete")
+        try fixture.saveWorkspace()
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+        viewModel.transferMode = .delete
+
+        let deleted = viewModel.trashDroppedItems(at: [fileURL])
+
+        XCTAssertTrue(deleted)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
+        XCTAssertEqual(viewModel.itemsByCardID[fixture.sourceCard.id]?.map(\.name), [])
+        XCTAssertEqual(viewModel.transferMode, .copy)
+        XCTAssertNil(viewModel.errorsByCardID[fixture.sourceCard.id])
+    }
+
+    func testTrashDroppedItemsDoesNothingUnlessDeleteModeIsSelected() throws {
+        let fixture = try WorkspaceViewModelTransferFixture()
+        defer { fixture.cleanUp() }
+        let fileURL = try fixture.createSourceFile(named: "KeepMe.txt", contents: "keep")
+        try fixture.saveWorkspace()
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+
+        let deleted = viewModel.trashDroppedItems(at: [fileURL])
+
+        XCTAssertFalse(deleted)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
+        XCTAssertEqual(viewModel.itemsByCardID[fixture.sourceCard.id]?.map(\.name), ["KeepMe.txt"])
+        XCTAssertEqual(viewModel.transferMode, .copy)
+    }
 }
 
 private struct WorkspaceViewModelTransferFixture {

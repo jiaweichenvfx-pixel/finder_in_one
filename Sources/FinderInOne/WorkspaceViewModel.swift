@@ -492,6 +492,10 @@ final class WorkspaceViewModel {
 
     @discardableResult
     func transfer(items: [FileItem], to targetCard: FolderCard) -> Bool {
+        guard transferMode != .delete else {
+            errorsByCardID[targetCard.id] = "Drop on blank canvas to delete"
+            return false
+        }
         guard !items.isEmpty else {
             return false
         }
@@ -531,6 +535,51 @@ final class WorkspaceViewModel {
             errorsByCardID[targetCard.id] = "Transfer failed"
         }
         return didTransferAllItems
+    }
+
+    @discardableResult
+    func trashDroppedItems(at urls: [URL]) -> Bool {
+        guard transferMode == .delete else {
+            return false
+        }
+        defer {
+            transferMode = .copy
+        }
+
+        let standardizedURLs = uniqueStandardizedURLs(urls)
+        guard !standardizedURLs.isEmpty else {
+            return false
+        }
+
+        var impactedCardIDs = Set<UUID>()
+        var didTrashAllItems = true
+        for url in standardizedURLs {
+            do {
+                _ = try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+                impactedCardIDs.formUnion(cardIDsImpactedByDeleting(url))
+            } catch {
+                didTrashAllItems = false
+            }
+        }
+
+        for cardID in impactedCardIDs {
+            guard let card = workspace.cards.first(where: { $0.id == cardID }) else {
+                continue
+            }
+            refresh(card: card)
+            selectedItemURLsByCardID[cardID]?.subtract(standardizedURLs)
+        }
+
+        if didTrashAllItems {
+            for cardID in impactedCardIDs {
+                errorsByCardID[cardID] = nil
+            }
+        } else {
+            for cardID in impactedCardIDs {
+                errorsByCardID[cardID] = "Delete failed"
+            }
+        }
+        return didTrashAllItems
     }
 
     func refresh(card: FolderCard) {
@@ -735,6 +784,8 @@ final class WorkspaceViewModel {
             return .copy
         case .moveOnce:
             return .move
+        case .delete:
+            return .copy
         }
     }
 
@@ -785,5 +836,17 @@ final class WorkspaceViewModel {
         if targetCard.folderURL.standardizedFileURL != sourceDirectory {
             refresh(card: targetCard)
         }
+    }
+
+    private func cardIDsImpactedByDeleting(_ url: URL) -> Set<UUID> {
+        let standardizedURL = url.standardizedFileURL
+        let parentURL = standardizedURL.deletingLastPathComponent().standardizedFileURL
+        return Set(workspace.cards.compactMap { card in
+            let cardURL = card.folderURL.standardizedFileURL
+            if cardURL == parentURL || cardURL == standardizedURL || cardURL.path.hasPrefix(standardizedURL.path + "/") {
+                return card.id
+            }
+            return nil
+        })
     }
 }

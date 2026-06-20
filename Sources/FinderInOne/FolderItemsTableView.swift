@@ -10,6 +10,8 @@ extension TransferMode {
             return .copy
         case .moveOnce:
             return .move
+        case .delete:
+            return .delete
         }
     }
 
@@ -18,6 +20,8 @@ extension TransferMode {
         case .copy:
             return .copy
         case .moveOnce:
+            return .move
+        case .delete:
             return .move
         }
     }

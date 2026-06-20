@@ -37,9 +37,12 @@ struct WorkspaceView: View {
                     of: [.fileURL, .url],
                     delegate: CanvasFolderDropDelegate(
                         viewport: viewport,
-                        operation: viewModel.transferMode.dropProposalOperation,
+                        transferMode: viewModel.transferMode,
                         onDropFolderURLs: { urls, worldPoint in
                             viewModel.addDroppedFolderURLs(urls, at: worldPoint)
+                        },
+                        onDeleteURLs: { urls in
+                            viewModel.trashDroppedItems(at: urls)
                         }
                     )
                 )
@@ -226,6 +229,9 @@ struct WorkspaceView: View {
             }
             modeButton("Move once", isSelected: viewModel.transferMode == .moveOnce) {
                 viewModel.transferMode = .moveOnce
+            }
+            modeButton("Delete", isSelected: viewModel.transferMode == .delete) {
+                viewModel.transferMode = .delete
             }
             Button {
                 viewModel.refreshAllCards()
@@ -422,15 +428,16 @@ struct WorkspaceView: View {
 
 private struct CanvasFolderDropDelegate: DropDelegate {
     let viewport: CanvasViewport
-    let operation: DropOperation
+    let transferMode: TransferMode
     let onDropFolderURLs: ([URL], CGPoint) -> Bool
+    let onDeleteURLs: ([URL]) -> Bool
 
     func validateDrop(info: DropInfo) -> Bool {
         info.hasItemsConforming(to: DropURLParsing.acceptedFileURLTypeIdentifiers)
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: operation)
+        DropProposal(operation: transferMode.dropProposalOperation)
     }
 
     func performDrop(info: DropInfo) -> Bool {
@@ -447,7 +454,11 @@ private struct CanvasFolderDropDelegate: DropDelegate {
             guard !urls.isEmpty else {
                 return
             }
-            _ = onDropFolderURLs(urls, worldPoint)
+            if transferMode == .delete {
+                _ = onDeleteURLs(urls)
+            } else {
+                _ = onDropFolderURLs(urls, worldPoint)
+            }
         }
         return true
     }

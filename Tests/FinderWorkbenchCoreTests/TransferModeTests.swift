@@ -30,4 +30,12 @@ final class TransferModeTests: XCTestCase {
         XCTAssertEqual(controller.mode, .copy)
         XCTAssertEqual(controller.currentOperation, .copy)
     }
+
+    func testDeleteModeKeepsCopyAsCurrentTransferOperation() {
+        let controller = TransferModeController()
+        controller.enableDelete()
+
+        XCTAssertEqual(controller.mode, .delete)
+        XCTAssertEqual(controller.currentOperation, .copy)
+    }
 }

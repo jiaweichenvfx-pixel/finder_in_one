@@ -3,6 +3,7 @@ import Foundation
 public enum TransferMode: String, Codable, Equatable, Sendable {
     case copy
     case moveOnce
+    case delete
 }
 
 public enum FileTransferOperation: String, Codable, Equatable, Sendable {
@@ -23,6 +24,8 @@ public final class TransferModeController {
             return .copy
         case .moveOnce:
             return .move
+        case .delete:
+            return .copy
         }
     }
 
@@ -32,6 +35,10 @@ public final class TransferModeController {
 
     public func enableMoveOnce() {
         mode = .moveOnce
+    }
+
+    public func enableDelete() {
+        mode = .delete
     }
 
     public func operationDidFinish() {
