@@ -31,6 +31,7 @@ struct FolderCardView: View {
     let viewportScale: CGFloat
 
     @State private var isDropTargeted = false
+    @State private var isMoving = false
     @State private var moveStartFrame: CardFrame?
     @State private var moveTranslation: CGSize = .zero
     @State private var resizeStartFrame: CardFrame?
@@ -41,22 +42,26 @@ struct FolderCardView: View {
             if !card.isCollapsed {
                 Divider()
                     .overlay(Color.white.opacity(0.18))
-                suffixFilterField
-                if let errorMessage {
-                    Text(errorMessage)
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.68))
-                    Spacer(minLength: 0)
-                } else if items.isEmpty {
-                    Text("No visible items")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.68))
-                    Spacer(minLength: 0)
+                if isMoving {
+                    dragPlaceholder
                 } else {
-                    fileRows
-                }
-                if card.canResize {
-                    resizeHandle
+                    suffixFilterField
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.68))
+                        Spacer(minLength: 0)
+                    } else if items.isEmpty {
+                        Text("No visible items")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.68))
+                        Spacer(minLength: 0)
+                    } else {
+                        fileRows
+                    }
+                    if card.canResize {
+                        resizeHandle
+                    }
                 }
             }
         }
@@ -70,6 +75,7 @@ struct FolderCardView: View {
         )
         .onDrop(of: [.fileURL, .url], isTargeted: $isDropTargeted, perform: handleDrop(providers:))
         .offset(moveTranslation)
+        .animation(nil, value: moveTranslation)
     }
 
     private var header: some View {
@@ -187,6 +193,20 @@ struct FolderCardView: View {
         )
     }
 
+    private var dragPlaceholder: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            ForEach(0..<5, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color.white.opacity(index == 0 ? 0.13 : 0.08))
+                    .frame(height: 10)
+                    .frame(maxWidth: index == 0 ? .infinity : CGFloat(180 + index * 24), alignment: .leading)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.top, 4)
+        .allowsHitTesting(false)
+    }
+
     private var suffixFilterField: some View {
         HStack(spacing: 5) {
             Image(systemName: "line.3.horizontal.decrease.circle")
@@ -223,6 +243,7 @@ struct FolderCardView: View {
         DragGesture(minimumDistance: 2)
             .onChanged { value in
                 moveStartFrame = moveStartFrame ?? card.frame
+                isMoving = true
                 moveTranslation = value.translation
             }
             .onEnded { value in
@@ -234,6 +255,7 @@ struct FolderCardView: View {
                 )
                 moveTranslation = .zero
                 moveStartFrame = nil
+                isMoving = false
             }
     }
 
