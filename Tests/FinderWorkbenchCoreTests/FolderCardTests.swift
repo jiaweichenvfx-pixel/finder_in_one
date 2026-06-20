@@ -205,6 +205,25 @@ extension FolderCardTests {
         XCTAssertEqual(card.color, .graphite)
     }
 
+    func testFolderCardPersistsViewState() throws {
+        let selectedPath = "/tmp/Projects/plate.mov"
+        let card = FolderCard(
+            displayName: "Projects",
+            folderPath: "/tmp/Projects",
+            frame: CardFrame(x: 0, y: 0, width: 240, height: 180),
+            suffixFilterText: "mov",
+            sortOrder: FileItemSortOrder(column: .size, ascending: false),
+            selectedItemPaths: [selectedPath]
+        )
+
+        let data = try JSONEncoder().encode(card)
+        let decoded = try JSONDecoder().decode(FolderCard.self, from: data)
+
+        XCTAssertEqual(decoded.suffixFilterText, "mov")
+        XCTAssertEqual(decoded.sortOrder, FileItemSortOrder(column: .size, ascending: false))
+        XCTAssertEqual(decoded.selectedItemPaths, [selectedPath])
+    }
+
     func testFolderCardDecodesMissingColorAsGraphite() throws {
         let json = """
         {

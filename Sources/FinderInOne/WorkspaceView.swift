@@ -90,12 +90,16 @@ struct WorkspaceView: View {
             onSetColor: { color in viewModel.setCardColor(color, for: card.id) },
             selectedItemURLs: viewModel.selectedItemURLsByCardID[card.id] ?? [],
             suffixFilterText: viewModel.suffixFilterTextByCardID[card.id] ?? "",
+            sortOrder: viewModel.sortOrderByCardID[card.id] ?? FileItemSortOrder(column: .name, ascending: true),
             transferMode: viewModel.transferMode,
             onSelectionChange: { urls in
                 viewModel.setSelectedItemURLs(urls, for: card.id)
             },
             onSuffixFilterChange: { text in
                 viewModel.setSuffixFilter(text, for: card.id)
+            },
+            onSortOrderChange: { sortOrder in
+                viewModel.setSortOrder(sortOrder, for: card.id)
             },
             onDropFiles: { urls in
                 viewModel.transfer(items: urls.map(fileItem(for:)), to: card)

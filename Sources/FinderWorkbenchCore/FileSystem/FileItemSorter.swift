@@ -1,13 +1,13 @@
 import Foundation
 
-public enum FileItemSortColumn: String, Sendable {
+public enum FileItemSortColumn: String, Codable, Sendable {
     case name
     case modified
     case size
     case kind
 }
 
-public struct FileItemSortOrder: Equatable, Sendable {
+public struct FileItemSortOrder: Codable, Equatable, Sendable {
     public let column: FileItemSortColumn
     public let ascending: Bool
 

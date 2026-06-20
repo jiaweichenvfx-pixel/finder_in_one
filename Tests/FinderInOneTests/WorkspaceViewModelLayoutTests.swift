@@ -172,6 +172,46 @@ final class WorkspaceViewModelLayoutTests: XCTestCase {
         XCTAssertEqual(viewModel.displayedItems(for: fixture.card).map(\.name), ["notes.txt", "plate.mov"])
     }
 
+    func testRestoresCardViewStateFromWorkspace() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
+        defer { fixture.cleanUp() }
+        let selectedURL = try fixture.createFile(in: fixture.folderURL, named: "plate.mov", contents: "mov")
+        try fixture.createFile(in: fixture.folderURL, named: "notes.txt", contents: "txt")
+        let statefulCard = FolderCard(
+            id: fixture.card.id,
+            displayName: fixture.card.displayName,
+            folderPath: fixture.card.folderPath,
+            frame: fixture.card.frame,
+            suffixFilterText: "mov",
+            sortOrder: FileItemSortOrder(column: .size, ascending: false),
+            selectedItemPaths: [selectedURL.path]
+        )
+        try fixture.store.save(Workspace(cards: [statefulCard]))
+
+        let viewModel = WorkspaceViewModel(store: fixture.store, templateStore: fixture.templateStore)
+
+        XCTAssertEqual(viewModel.suffixFilterTextByCardID[fixture.card.id], "mov")
+        XCTAssertEqual(viewModel.sortOrderByCardID[fixture.card.id], FileItemSortOrder(column: .size, ascending: false))
+        XCTAssertEqual(viewModel.selectedItemURLsByCardID[fixture.card.id], [selectedURL])
+    }
+
+    func testCardViewStateChangesPersistToWorkspace() throws {
+        let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
+        defer { fixture.cleanUp() }
+        let selectedURL = try fixture.createFile(in: fixture.folderURL, named: "plate.mov", contents: "mov")
+        try fixture.saveWorkspace()
+        let viewModel = WorkspaceViewModel(store: fixture.store, templateStore: fixture.templateStore)
+
+        viewModel.setSuffixFilter("mov", for: fixture.card.id)
+        viewModel.setSortOrder(FileItemSortOrder(column: .size, ascending: false), for: fixture.card.id)
+        viewModel.setSelectedItemURLs([selectedURL], for: fixture.card.id)
+
+        let persistedCard = try XCTUnwrap(try fixture.store.load().cards.first)
+        XCTAssertEqual(persistedCard.suffixFilterText, "mov")
+        XCTAssertEqual(persistedCard.sortOrder, FileItemSortOrder(column: .size, ascending: false))
+        XCTAssertEqual(persistedCard.selectedItemPaths, [selectedURL.path])
+    }
+
     func testAddFolderURLCreatesCardRefreshesAndPersists() throws {
         let fixture = try WorkspaceViewModelLayoutFixture(isLocked: false)
         defer { fixture.cleanUp() }

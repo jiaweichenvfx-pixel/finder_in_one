@@ -18,6 +18,7 @@ final class WorkspaceViewModel {
     var errorsByCardID: [UUID: String] = [:]
     var selectedItemURLsByCardID: [UUID: Set<URL>] = [:]
     var suffixFilterTextByCardID: [UUID: String] = [:]
+    var sortOrderByCardID: [UUID: FileItemSortOrder] = [:]
     var templateSlots: [WorkspaceTemplateSlot] = []
     var activeTemplateIndex: Int?
     var focusedCardID: UUID?
@@ -51,6 +52,7 @@ final class WorkspaceViewModel {
         self.allowedTransferRoot = allowedTransferRoot
         self.workspace = (try? store.load()) ?? Workspace()
         self.templateSlots = ((try? templateStore.load()) ?? WorkspaceTemplateLibrary()).slots
+        restoreCardViewState()
         refreshAllCards()
     }
 
@@ -136,6 +138,8 @@ final class WorkspaceViewModel {
         itemsByCardID[id] = nil
         errorsByCardID[id] = nil
         selectedItemURLsByCardID[id] = nil
+        suffixFilterTextByCardID[id] = nil
+        sortOrderByCardID[id] = nil
         save()
     }
 
@@ -183,6 +187,12 @@ final class WorkspaceViewModel {
 
     func setSelectedItemURLs(_ urls: Set<URL>, for cardID: UUID) {
         selectedItemURLsByCardID[cardID] = urls
+        updateCard(cardID) { card in
+            card.selectedItemPaths = urls
+                .map(\.path)
+                .sorted { lhs, rhs in lhs.localizedStandardCompare(rhs) == .orderedAscending }
+        }
+        save()
     }
 
     func setSuffixFilter(_ text: String, for cardID: UUID) {
@@ -192,6 +202,18 @@ final class WorkspaceViewModel {
         } else {
             suffixFilterTextByCardID[cardID] = text
         }
+        updateCard(cardID) { card in
+            card.suffixFilterText = trimmedText.isEmpty ? nil : text
+        }
+        save()
+    }
+
+    func setSortOrder(_ sortOrder: FileItemSortOrder, for cardID: UUID) {
+        sortOrderByCardID[cardID] = sortOrder
+        updateCard(cardID) { card in
+            card.sortOrder = sortOrder
+        }
+        save()
     }
 
     func displayedItems(for card: FolderCard) -> [FileItem] {
@@ -294,7 +316,7 @@ final class WorkspaceViewModel {
         activeTemplateIndex = index
         itemsByCardID = [:]
         errorsByCardID = [:]
-        selectedItemURLsByCardID = [:]
+        restoreCardViewState()
         refreshAllCards()
         save()
         return true
@@ -411,6 +433,34 @@ final class WorkspaceViewModel {
         try? store.save(workspace)
     }
 
+    private func restoreCardViewState() {
+        selectedItemURLsByCardID = [:]
+        suffixFilterTextByCardID = [:]
+        sortOrderByCardID = [:]
+
+        for card in workspace.cards {
+            if let suffixFilterText = card.suffixFilterText,
+               !suffixFilterText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                suffixFilterTextByCardID[card.id] = suffixFilterText
+            }
+            if let sortOrder = card.sortOrder {
+                sortOrderByCardID[card.id] = sortOrder
+            }
+            let selectedURLs = Set(card.selectedItemPaths.map { URL(fileURLWithPath: $0) })
+            if !selectedURLs.isEmpty {
+                selectedItemURLsByCardID[card.id] = selectedURLs
+            }
+        }
+    }
+
+    private func updateCard(_ cardID: UUID, mutate: (inout FolderCard) -> Void) {
+        guard var card = workspace.cards.first(where: { $0.id == cardID }) else {
+            return
+        }
+        mutate(&card)
+        workspace.updateCard(card)
+    }
+
     private func normalizedFolderPath(_ url: URL) -> String {
         URL(fileURLWithPath: url.path, isDirectory: true).standardizedFileURL.path
     }
@@ -519,6 +569,7 @@ final class WorkspaceViewModel {
     private func navigate(card: inout FolderCard, to url: URL) {
         card.folderPath = url.path
         card.displayName = url.lastPathComponent.isEmpty ? url.path : url.lastPathComponent
+        card.selectedItemPaths = []
         workspace.updateCard(card)
         selectedItemURLsByCardID[card.id] = []
         refresh(card: card)

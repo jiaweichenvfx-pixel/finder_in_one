@@ -35,6 +35,9 @@ public struct FolderCard: Codable, Equatable, Identifiable, Sendable {
     public var isCollapsed: Bool
     public var expandedFrame: CardFrame?
     public var color: FolderCardColor
+    public var suffixFilterText: String?
+    public var sortOrder: FileItemSortOrder?
+    public var selectedItemPaths: [String]
 
     public init(
         id: UUID = UUID(),
@@ -45,7 +48,10 @@ public struct FolderCard: Codable, Equatable, Identifiable, Sendable {
         bookmarkData: Data? = nil,
         isCollapsed: Bool = false,
         expandedFrame: CardFrame? = nil,
-        color: FolderCardColor = .graphite
+        color: FolderCardColor = .graphite,
+        suffixFilterText: String? = nil,
+        sortOrder: FileItemSortOrder? = nil,
+        selectedItemPaths: [String] = []
     ) {
         self.id = id
         self.displayName = displayName
@@ -56,6 +62,9 @@ public struct FolderCard: Codable, Equatable, Identifiable, Sendable {
         self.isCollapsed = isCollapsed
         self.expandedFrame = expandedFrame
         self.color = color
+        self.suffixFilterText = suffixFilterText
+        self.sortOrder = sortOrder
+        self.selectedItemPaths = selectedItemPaths
     }
 
     public var folderURL: URL {
@@ -121,6 +130,9 @@ public struct FolderCard: Codable, Equatable, Identifiable, Sendable {
         case isCollapsed
         case expandedFrame
         case color
+        case suffixFilterText
+        case sortOrder
+        case selectedItemPaths
     }
 
     public init(from decoder: Decoder) throws {
@@ -134,5 +146,8 @@ public struct FolderCard: Codable, Equatable, Identifiable, Sendable {
         isCollapsed = try container.decodeIfPresent(Bool.self, forKey: .isCollapsed) ?? false
         expandedFrame = try container.decodeIfPresent(CardFrame.self, forKey: .expandedFrame)
         color = try container.decodeIfPresent(FolderCardColor.self, forKey: .color) ?? .graphite
+        suffixFilterText = try container.decodeIfPresent(String.self, forKey: .suffixFilterText)
+        sortOrder = try container.decodeIfPresent(FileItemSortOrder.self, forKey: .sortOrder)
+        selectedItemPaths = try container.decodeIfPresent([String].self, forKey: .selectedItemPaths) ?? []
     }
 }

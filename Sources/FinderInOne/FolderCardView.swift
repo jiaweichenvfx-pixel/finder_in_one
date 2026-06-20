@@ -14,9 +14,11 @@ struct FolderCardView: View {
     let onSetColor: (FolderCardColor) -> Void
     let selectedItemURLs: Set<URL>
     let suffixFilterText: String
+    let sortOrder: FileItemSortOrder
     let transferMode: TransferMode
     let onSelectionChange: (Set<URL>) -> Void
     let onSuffixFilterChange: (String) -> Void
+    let onSortOrderChange: (FileItemSortOrder) -> Void
     let onDropFiles: ([URL]) -> Bool
     let onOpenItem: (FileItem) -> Void
     let onPreviewItems: ([FileItem], FileItem?) -> Void
@@ -138,8 +140,10 @@ struct FolderCardView: View {
         FolderItemsTableView(
             items: items,
             selectedItemURLs: selectedItemURLs,
+            sortOrder: sortOrder,
             transferMode: transferMode,
             onSelectionChange: onSelectionChange,
+            onSortOrderChange: onSortOrderChange,
             onOpenItem: onOpenItem,
             onPreviewItems: onPreviewItems,
             onDropURLs: onDropFiles

@@ -27,8 +27,10 @@ extension TransferMode {
 struct FolderItemsTableView: NSViewRepresentable {
     let items: [FileItem]
     let selectedItemURLs: Set<URL>
+    let sortOrder: FileItemSortOrder
     let transferMode: TransferMode
     let onSelectionChange: (Set<URL>) -> Void
+    let onSortOrderChange: (FileItemSortOrder) -> Void
     let onOpenItem: (FileItem) -> Void
     let onPreviewItems: ([FileItem], FileItem?) -> Void
     let onDropURLs: ([URL]) -> Bool
@@ -48,7 +50,7 @@ struct FolderItemsTableView: NSViewRepresentable {
         tableView.delegate = context.coordinator
         tableView.target = context.coordinator
         tableView.doubleAction = #selector(Coordinator.doubleClicked(_:))
-        tableView.sortDescriptors = [NSSortDescriptor(key: "name", ascending: true)]
+        tableView.sortDescriptors = [Self.sortDescriptor(for: sortOrder)]
         tableView.setDraggingSourceOperationMask(transferMode.dragOperation, forLocal: true)
         tableView.setDraggingSourceOperationMask(transferMode.dragOperation, forLocal: false)
         tableView.registerForDraggedTypes([.fileURL])
@@ -80,10 +82,15 @@ struct FolderItemsTableView: NSViewRepresentable {
         tableView.setDraggingSourceOperationMask(transferMode.dragOperation, forLocal: false)
 
         let itemFingerprint = items
+        let sortChanged = context.coordinator.sortOrder != sortOrder
         let shouldReload = context.coordinator.lastItemFingerprint != itemFingerprint
         let shouldSelect = shouldReload || context.coordinator.lastSelectedItemURLs != selectedItemURLs
 
-        if shouldReload {
+        if sortChanged {
+            context.coordinator.sortOrder = sortOrder
+            context.coordinator.applySortDescriptor(sortOrder, to: tableView)
+        }
+        if shouldReload || sortChanged {
             context.coordinator.refreshSortedItems()
             tableView.reloadData()
             context.coordinator.lastItemFingerprint = itemFingerprint
@@ -111,17 +118,23 @@ struct FolderItemsTableView: NSViewRepresentable {
         tableView.addTableColumn(column)
     }
 
+    private static func sortDescriptor(for order: FileItemSortOrder) -> NSSortDescriptor {
+        NSSortDescriptor(key: order.column.rawValue, ascending: order.ascending)
+    }
+
     @MainActor
     final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         var parent: FolderItemsTableView
         var isApplyingSelection = false
+        var isApplyingSortDescriptor = false
         var lastItemFingerprint: [FileItem] = []
         var lastSelectedItemURLs: Set<URL> = []
         private var sortedItems: [FileItem] = []
-        private var sortOrder = FileItemSortOrder(column: .name, ascending: true)
+        var sortOrder: FileItemSortOrder
 
         init(_ parent: FolderItemsTableView) {
             self.parent = parent
+            self.sortOrder = parent.sortOrder
             self.sortedItems = FileItemSorter.sorted(parent.items, by: sortOrder)
         }
 
@@ -185,6 +198,9 @@ struct FolderItemsTableView: NSViewRepresentable {
             sortOrder = FileItemSortOrder(column: column, ascending: descriptor.ascending)
             refreshSortedItems()
             tableView.reloadData()
+            if !isApplyingSortDescriptor {
+                parent.onSortOrderChange(sortOrder)
+            }
 
             isApplyingSelection = true
             tableView.selectRowIndexes(selectedRows(for: parent.selectedItemURLs), byExtendingSelection: false)
@@ -267,6 +283,18 @@ struct FolderItemsTableView: NSViewRepresentable {
 
         func refreshSortedItems() {
             sortedItems = FileItemSorter.sorted(parent.items, by: sortOrder)
+        }
+
+        func applySortDescriptor(_ order: FileItemSortOrder, to tableView: NSTableView) {
+            let currentDescriptor = tableView.sortDescriptors.first
+            guard currentDescriptor?.key != order.column.rawValue ||
+                    currentDescriptor?.ascending != order.ascending else {
+                return
+            }
+
+            isApplyingSortDescriptor = true
+            tableView.sortDescriptors = [NSSortDescriptor(key: order.column.rawValue, ascending: order.ascending)]
+            isApplyingSortDescriptor = false
         }
 
         func selectedRows(for selectedItemURLs: Set<URL>) -> IndexSet {
