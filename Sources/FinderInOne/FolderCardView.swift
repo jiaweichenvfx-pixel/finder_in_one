@@ -155,30 +155,29 @@ struct FolderCardView: View {
     }
 
     private var breadcrumbRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 3) {
-                ForEach(breadcrumbSegments) { segment in
-                    if segment.id != breadcrumbSegments.first?.id {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 8, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.34))
-                    }
-                    Button {
-                        onNavigateToBreadcrumb(segment.url)
-                    } label: {
-                        Text(segment.label)
-                            .font(.system(size: 10, weight: segment.isCurrent ? .semibold : .regular))
-                            .lineLimit(1)
-                            .foregroundStyle(segment.isCurrent ? .white.opacity(0.82) : .white.opacity(0.58))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(segment.isCurrent)
-                    .help(segment.url.path)
+        HStack(spacing: 3) {
+            ForEach(breadcrumbSegments) { segment in
+                if segment.id != breadcrumbSegments.first?.id {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.34))
                 }
+                Button {
+                    onNavigateToBreadcrumb(segment.url)
+                } label: {
+                    Text(segment.label)
+                        .font(.system(size: 10, weight: segment.isCurrent ? .semibold : .regular))
+                        .lineLimit(1)
+                        .foregroundStyle(segment.isCurrent ? .white.opacity(0.82) : .white.opacity(0.58))
+                }
+                .buttonStyle(.plain)
+                .disabled(segment.isCurrent)
+                .help(segment.url.path)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: 14)
+        .clipped()
     }
 
     private var fileRows: some View {
