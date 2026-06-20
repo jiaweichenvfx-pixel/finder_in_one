@@ -70,6 +70,8 @@ cat > "${CONTENTS_DIR}/Info.plist" <<PLIST
 </plist>
 PLIST
 
+printf 'APPL????' > "${CONTENTS_DIR}/PkgInfo"
+
 codesign --force --sign - "${APP_BUNDLE}" >/dev/null
 
 echo "${APP_BUNDLE}"
