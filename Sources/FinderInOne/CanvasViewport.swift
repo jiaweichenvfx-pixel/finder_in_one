@@ -9,17 +9,38 @@ struct CanvasViewport: Equatable {
     var offset: CGSize = Self.defaultOffset
 
     mutating func zoom(by factor: CGFloat, around screenPoint: CGPoint) {
+        guard factor.isFinite,
+              factor > 0,
+              scale.isFinite,
+              scale > 0,
+              offset.width.isFinite,
+              offset.height.isFinite,
+              screenPoint.x.isFinite,
+              screenPoint.y.isFinite else {
+            return
+        }
+
         let oldScale = scale
-        let newScale = min(max(oldScale * factor, Self.minimumScale), Self.maximumScale)
+        let proposedScale = oldScale * factor
+        guard proposedScale.isFinite else {
+            return
+        }
+
+        let newScale = min(max(proposedScale, Self.minimumScale), Self.maximumScale)
         guard newScale != oldScale else {
             return
         }
 
         let scaleRatio = newScale / oldScale
-        offset = CGSize(
+        let newOffset = CGSize(
             width: screenPoint.x - (screenPoint.x - offset.width) * scaleRatio,
             height: screenPoint.y - (screenPoint.y - offset.height) * scaleRatio
         )
+        guard newOffset.width.isFinite, newOffset.height.isFinite else {
+            return
+        }
+
+        offset = newOffset
         scale = newScale
     }
 

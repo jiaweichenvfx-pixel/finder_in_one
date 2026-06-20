@@ -22,6 +22,9 @@ final class CanvasInputNSView: NSView {
     var onZoom: ((CGFloat, CGPoint) -> Void)?
     var onPan: ((CGSize) -> Void)?
     private var middleMouseMonitor: Any?
+    private var zoomAccumulator = CanvasZoomAccumulator()
+    private var pendingZoomPoint: CGPoint?
+    private var zoomFlushWorkItem: DispatchWorkItem?
 
     override var acceptsFirstResponder: Bool { true }
 
@@ -36,8 +39,9 @@ final class CanvasInputNSView: NSView {
             return
         }
 
-        let factor = exp(zoomDelta * 0.01)
-        onZoom?(factor, convert(event.locationInWindow, from: nil))
+        zoomAccumulator.add(delta: zoomDelta)
+        pendingZoomPoint = convert(event.locationInWindow, from: nil)
+        scheduleZoomFlush()
     }
 
     override func otherMouseDragged(with event: NSEvent) {
@@ -51,10 +55,42 @@ final class CanvasInputNSView: NSView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         if window == nil {
+            cancelZoomFlush()
             stopMiddleMouseMonitor()
         } else {
             startMiddleMouseMonitor()
         }
+    }
+
+    private func scheduleZoomFlush() {
+        guard zoomFlushWorkItem == nil else {
+            return
+        }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.flushZoom()
+        }
+        zoomFlushWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(16), execute: workItem)
+    }
+
+    private func flushZoom() {
+        zoomFlushWorkItem = nil
+        guard let point = pendingZoomPoint,
+              let factor = zoomAccumulator.makeZoomFactorAndReset() else {
+            pendingZoomPoint = nil
+            return
+        }
+
+        pendingZoomPoint = nil
+        onZoom?(factor, point)
+    }
+
+    private func cancelZoomFlush() {
+        zoomFlushWorkItem?.cancel()
+        zoomFlushWorkItem = nil
+        pendingZoomPoint = nil
+        _ = zoomAccumulator.makeZoomFactorAndReset()
     }
 
     private func startMiddleMouseMonitor() {

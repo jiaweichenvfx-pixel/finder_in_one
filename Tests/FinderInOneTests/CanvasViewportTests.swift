@@ -35,6 +35,30 @@ final class CanvasViewportTests: XCTestCase {
         XCTAssertEqual(viewport.scale, CanvasViewport.maximumScale)
     }
 
+    func testZoomIgnoresNonFiniteInput() {
+        var viewport = CanvasViewport(scale: 1, offset: CGSize(width: 24, height: 32))
+
+        viewport.zoom(by: .nan, around: CGPoint(x: 100, y: 100))
+        XCTAssertEqual(viewport.scale, 1)
+        XCTAssertEqual(viewport.offset.width, 24)
+        XCTAssertEqual(viewport.offset.height, 32)
+
+        viewport.zoom(by: .infinity, around: CGPoint(x: 100, y: 100))
+        XCTAssertEqual(viewport.scale, 1)
+        XCTAssertEqual(viewport.offset.width, 24)
+        XCTAssertEqual(viewport.offset.height, 32)
+    }
+
+    func testZoomKeepsOffsetFiniteAfterExtremeFactors() {
+        var viewport = CanvasViewport(scale: 1, offset: CGSize(width: 24, height: 32))
+
+        viewport.zoom(by: .greatestFiniteMagnitude, around: CGPoint(x: 100, y: 100))
+
+        XCTAssertTrue(viewport.scale.isFinite)
+        XCTAssertTrue(viewport.offset.width.isFinite)
+        XCTAssertTrue(viewport.offset.height.isFinite)
+    }
+
     func testResetRestoresDefaultView() {
         var viewport = CanvasViewport(scale: 0.5, offset: CGSize(width: -400, height: 300))
 
