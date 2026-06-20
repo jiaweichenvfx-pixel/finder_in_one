@@ -104,6 +104,74 @@ final class WorkspaceViewModelOpenItemTests: XCTestCase {
         XCTAssertEqual(try fixture.store.load().cards.first?.folderPath, fixture.folderURL.path)
     }
 
+    func testCreateFolderInCardCreatesDirectoryRefreshesAndSelectsIt() throws {
+        let fixture = try WorkspaceViewModelOpenItemFixture()
+        defer { fixture.cleanUp() }
+        try fixture.saveWorkspace()
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+
+        let created = viewModel.createFolder(in: fixture.card, named: "New Shot")
+
+        let createdURL = fixture.folderURL.appendingPathComponent("New Shot", isDirectory: true)
+        XCTAssertTrue(created)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: createdURL.path))
+        XCTAssertEqual(viewModel.itemsByCardID[fixture.card.id]?.map(\.name), ["New Shot"])
+        XCTAssertEqual(viewModel.selectedItemURLsByCardID[fixture.card.id], [createdURL])
+        XCTAssertNil(viewModel.errorsByCardID[fixture.card.id])
+    }
+
+    func testCreateFolderRejectsInvalidOrDuplicateName() throws {
+        let fixture = try WorkspaceViewModelOpenItemFixture()
+        defer { fixture.cleanUp() }
+        _ = try fixture.createFolder(named: "Existing")
+        try fixture.saveWorkspace()
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+
+        XCTAssertFalse(viewModel.createFolder(in: fixture.card, named: "Existing"))
+        XCTAssertFalse(viewModel.createFolder(in: fixture.card, named: "Bad/Name"))
+
+        XCTAssertEqual(viewModel.itemsByCardID[fixture.card.id]?.map(\.name), ["Existing"])
+        XCTAssertNotNil(viewModel.errorsByCardID[fixture.card.id])
+    }
+
+    func testRenameSelectedItemRenamesFileRefreshesAndSelectsNewURL() throws {
+        let fixture = try WorkspaceViewModelOpenItemFixture()
+        defer { fixture.cleanUp() }
+        let oldURL = try fixture.createFile(named: "old.txt", contents: "hello")
+        try fixture.saveWorkspace()
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+        viewModel.setSelectedItemURLs([oldURL], for: fixture.card.id)
+
+        let renamed = viewModel.renameSelectedItem(in: fixture.card, to: "new.txt")
+
+        let newURL = fixture.folderURL.appendingPathComponent("new.txt")
+        XCTAssertTrue(renamed)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: newURL.path))
+        XCTAssertEqual(viewModel.itemsByCardID[fixture.card.id]?.map(\.name), ["new.txt"])
+        XCTAssertEqual(viewModel.selectedItemURLsByCardID[fixture.card.id], [newURL])
+        XCTAssertEqual(try String(contentsOf: newURL, encoding: .utf8), "hello")
+    }
+
+    func testRenameSelectedItemRejectsMultipleSelectionsAndDuplicateName() throws {
+        let fixture = try WorkspaceViewModelOpenItemFixture()
+        defer { fixture.cleanUp() }
+        let firstURL = try fixture.createFile(named: "first.txt", contents: "first")
+        let secondURL = try fixture.createFile(named: "second.txt", contents: "second")
+        try fixture.saveWorkspace()
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+
+        viewModel.setSelectedItemURLs([firstURL, secondURL], for: fixture.card.id)
+        XCTAssertFalse(viewModel.renameSelectedItem(in: fixture.card, to: "renamed.txt"))
+
+        viewModel.setSelectedItemURLs([firstURL], for: fixture.card.id)
+        XCTAssertFalse(viewModel.renameSelectedItem(in: fixture.card, to: "second.txt"))
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: firstURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: secondURL.path))
+        XCTAssertNotNil(viewModel.errorsByCardID[fixture.card.id])
+    }
+
     func testPreviewItemsSendsURLsToPreviewer() throws {
         let fixture = try WorkspaceViewModelOpenItemFixture()
         defer { fixture.cleanUp() }

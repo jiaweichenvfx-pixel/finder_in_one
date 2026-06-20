@@ -8,6 +8,10 @@ struct WorkspaceView: View {
     @State private var viewportSize: CGSize = .zero
     @State private var renamingTemplateIndex: Int?
     @State private var templateNameDraft = ""
+    @State private var creatingFolderCardID: UUID?
+    @State private var createFolderNameDraft = ""
+    @State private var renamingItemCardID: UUID?
+    @State private var renameItemNameDraft = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -75,6 +79,30 @@ struct WorkspaceView: View {
                 renamingTemplateIndex = nil
             }
         }
+        .alert("New Folder", isPresented: createFolderBinding) {
+            TextField("Name", text: $createFolderNameDraft)
+            Button("Cancel", role: .cancel) {
+                creatingFolderCardID = nil
+            }
+            Button("Create") {
+                if let card = card(for: creatingFolderCardID) {
+                    viewModel.createFolder(in: card, named: createFolderNameDraft)
+                }
+                creatingFolderCardID = nil
+            }
+        }
+        .alert("Rename Item", isPresented: renameItemBinding) {
+            TextField("Name", text: $renameItemNameDraft)
+            Button("Cancel", role: .cancel) {
+                renamingItemCardID = nil
+            }
+            Button("Rename") {
+                if let card = card(for: renamingItemCardID) {
+                    viewModel.renameSelectedItem(in: card, to: renameItemNameDraft)
+                }
+                renamingItemCardID = nil
+            }
+        }
     }
 
     private func cardView(for card: FolderCard) -> some View {
@@ -88,6 +116,14 @@ struct WorkspaceView: View {
             onOpenInFinder: { viewModel.openInFinder(card: card) },
             onClose: { viewModel.closeCard(id: card.id) },
             onSetColor: { color in viewModel.setCardColor(color, for: card.id) },
+            onRequestCreateFolder: {
+                creatingFolderCardID = card.id
+                createFolderNameDraft = "New Folder"
+            },
+            onRequestRenameSelectedItem: {
+                renamingItemCardID = card.id
+                renameItemNameDraft = selectedItemName(for: card) ?? ""
+            },
             breadcrumbSegments: viewModel.breadcrumbSegments(for: card),
             selectedItemURLs: viewModel.selectedItemURLsByCardID[card.id] ?? [],
             suffixFilterText: viewModel.suffixFilterTextByCardID[card.id] ?? "",
@@ -143,6 +179,20 @@ struct WorkspaceView: View {
             byteSize: nil,
             isDirectory: false
         )
+    }
+
+    private func card(for id: UUID?) -> FolderCard? {
+        guard let id else {
+            return nil
+        }
+        return viewModel.workspace.cards.first(where: { $0.id == id })
+    }
+
+    private func selectedItemName(for card: FolderCard) -> String? {
+        guard let selectedURL = viewModel.selectedItemURLsByCardID[card.id]?.first else {
+            return nil
+        }
+        return selectedURL.lastPathComponent
     }
 
     private var toolbar: some View {
@@ -253,6 +303,28 @@ struct WorkspaceView: View {
             set: { isPresented in
                 if !isPresented {
                     renamingTemplateIndex = nil
+                }
+            }
+        )
+    }
+
+    private var createFolderBinding: Binding<Bool> {
+        Binding(
+            get: { creatingFolderCardID != nil },
+            set: { isPresented in
+                if !isPresented {
+                    creatingFolderCardID = nil
+                }
+            }
+        )
+    }
+
+    private var renameItemBinding: Binding<Bool> {
+        Binding(
+            get: { renamingItemCardID != nil },
+            set: { isPresented in
+                if !isPresented {
+                    renamingItemCardID = nil
                 }
             }
         )

@@ -12,6 +12,8 @@ struct FolderCardView: View {
     let onOpenInFinder: () -> Void
     let onClose: () -> Void
     let onSetColor: (FolderCardColor) -> Void
+    let onRequestCreateFolder: () -> Void
+    let onRequestRenameSelectedItem: () -> Void
     let breadcrumbSegments: [BreadcrumbSegment]
     let selectedItemURLs: Set<URL>
     let suffixFilterText: String
@@ -102,6 +104,15 @@ struct FolderCardView: View {
                 }
                 .menuStyle(.button)
                 .help("Card color")
+                Button(action: onRequestCreateFolder) {
+                    Image(systemName: "folder.badge.plus")
+                }
+                .help("New folder")
+                Button(action: onRequestRenameSelectedItem) {
+                    Image(systemName: "pencil")
+                }
+                .disabled(selectedItemURLs.count != 1)
+                .help("Rename selected item")
                 Button(card.isLocked ? "Unlock" : "Lock", action: onToggleLock)
                 Button("Finder", action: onOpenInFinder)
                 if card.canClose {

@@ -342,6 +342,74 @@ final class WorkspaceViewModel {
     }
 
     @discardableResult
+    func createFolder(in card: FolderCard, named name: String) -> Bool {
+        guard let currentCard = workspace.cards.first(where: { $0.id == card.id }) else {
+            return false
+        }
+        guard let safeName = validatedFileName(name, cardID: card.id) else {
+            return false
+        }
+
+        let newFolderURL = currentCard.folderURL.appendingPathComponent(safeName, isDirectory: true)
+        guard !FileManager.default.fileExists(atPath: newFolderURL.path) else {
+            errorsByCardID[card.id] = "Name already exists"
+            return false
+        }
+
+        do {
+            try FileManager.default.createDirectory(at: newFolderURL, withIntermediateDirectories: false)
+            refresh(card: currentCard)
+            setSelectedItemURLs([newFolderURL], for: card.id)
+            errorsByCardID[card.id] = nil
+            return true
+        } catch {
+            errorsByCardID[card.id] = "Create folder failed"
+            return false
+        }
+    }
+
+    @discardableResult
+    func renameSelectedItem(in card: FolderCard, to name: String) -> Bool {
+        guard let currentCard = workspace.cards.first(where: { $0.id == card.id }) else {
+            return false
+        }
+        guard let selectedURLs = selectedItemURLsByCardID[card.id],
+              selectedURLs.count == 1,
+              let sourceURL = selectedURLs.first else {
+            errorsByCardID[card.id] = "Select one item to rename"
+            return false
+        }
+        guard sourceURL.deletingLastPathComponent().standardizedFileURL == currentCard.folderURL.standardizedFileURL else {
+            errorsByCardID[card.id] = "Selection is outside this folder"
+            return false
+        }
+        guard let safeName = validatedFileName(name, cardID: card.id) else {
+            return false
+        }
+
+        let destinationURL = currentCard.folderURL.appendingPathComponent(safeName)
+        guard destinationURL.standardizedFileURL != sourceURL.standardizedFileURL else {
+            errorsByCardID[card.id] = nil
+            return true
+        }
+        guard !FileManager.default.fileExists(atPath: destinationURL.path) else {
+            errorsByCardID[card.id] = "Name already exists"
+            return false
+        }
+
+        do {
+            try FileManager.default.moveItem(at: sourceURL, to: destinationURL)
+            refresh(card: currentCard)
+            setSelectedItemURLs([destinationURL], for: card.id)
+            errorsByCardID[card.id] = nil
+            return true
+        } catch {
+            errorsByCardID[card.id] = "Rename failed"
+            return false
+        }
+    }
+
+    @discardableResult
     func open(item: FileItem, in card: FolderCard) -> WorkspaceItemOpenResult {
         guard item.isDirectory else {
             fileOpening.open(item.url)
@@ -511,6 +579,19 @@ final class WorkspaceViewModel {
         }
         mutate(&card)
         workspace.updateCard(card)
+    }
+
+    private func validatedFileName(_ name: String, cardID: UUID) -> String? {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            errorsByCardID[cardID] = "Name is empty"
+            return nil
+        }
+        guard trimmedName != "." && trimmedName != ".." && !trimmedName.contains("/") else {
+            errorsByCardID[cardID] = "Name is invalid"
+            return nil
+        }
+        return trimmedName
     }
 
     private func normalizedFolderPath(_ url: URL) -> String {
