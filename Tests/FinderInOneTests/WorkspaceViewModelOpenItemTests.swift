@@ -62,6 +62,48 @@ final class WorkspaceViewModelOpenItemTests: XCTestCase {
         XCTAssertEqual(try fixture.store.load().cards.first?.folderPath, fixture.folderURL.path)
     }
 
+    func testBreadcrumbSegmentsIncludeCurrentFolderAncestors() throws {
+        let fixture = try WorkspaceViewModelOpenItemFixture()
+        defer { fixture.cleanUp() }
+        let childFolder = try fixture.createFolder(named: "Shots")
+        let nestedFolder = childFolder.appendingPathComponent("PlateA", isDirectory: true)
+        try FileManager.default.createDirectory(at: nestedFolder, withIntermediateDirectories: true)
+        var nestedCard = fixture.card
+        nestedCard.displayName = "PlateA"
+        nestedCard.folderPath = nestedFolder.path
+        try fixture.store.save(Workspace(cards: [nestedCard]))
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+
+        let segments = viewModel.breadcrumbSegments(for: nestedCard)
+
+        XCTAssertEqual(segments.suffix(3).map(\.label), ["Card", "Shots", "PlateA"])
+        XCTAssertEqual(segments.suffix(3).map(\.url.path), [fixture.folderURL.path, childFolder.path, nestedFolder.path])
+        XCTAssertEqual(segments.last?.isCurrent, true)
+    }
+
+    func testNavigateToBreadcrumbUpdatesCardRefreshesAndPersists() throws {
+        let fixture = try WorkspaceViewModelOpenItemFixture()
+        defer { fixture.cleanUp() }
+        let childFolder = try fixture.createFolder(named: "Shots")
+        let nestedFolder = childFolder.appendingPathComponent("PlateA", isDirectory: true)
+        try FileManager.default.createDirectory(at: nestedFolder, withIntermediateDirectories: true)
+        try "root".write(to: fixture.folderURL.appendingPathComponent("root.txt"), atomically: true, encoding: .utf8)
+        try "plate".write(to: nestedFolder.appendingPathComponent("plate.mov"), atomically: true, encoding: .utf8)
+        var nestedCard = fixture.card
+        nestedCard.displayName = "PlateA"
+        nestedCard.folderPath = nestedFolder.path
+        try fixture.store.save(Workspace(cards: [nestedCard]))
+        let viewModel = WorkspaceViewModel(store: fixture.store)
+
+        let navigated = viewModel.navigate(cardID: fixture.card.id, toFolder: fixture.folderURL)
+
+        XCTAssertTrue(navigated)
+        XCTAssertEqual(viewModel.workspace.cards.first?.folderPath, fixture.folderURL.path)
+        XCTAssertEqual(viewModel.workspace.cards.first?.displayName, "Card")
+        XCTAssertEqual(viewModel.itemsByCardID[fixture.card.id]?.map(\.name), ["Shots", "root.txt"])
+        XCTAssertEqual(try fixture.store.load().cards.first?.folderPath, fixture.folderURL.path)
+    }
+
     func testPreviewItemsSendsURLsToPreviewer() throws {
         let fixture = try WorkspaceViewModelOpenItemFixture()
         defer { fixture.cleanUp() }

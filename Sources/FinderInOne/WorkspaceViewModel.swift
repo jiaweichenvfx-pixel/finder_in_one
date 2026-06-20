@@ -9,6 +9,20 @@ enum WorkspaceItemOpenResult: Equatable {
     case failed
 }
 
+struct BreadcrumbSegment: Equatable, Identifiable {
+    let id: String
+    let label: String
+    let url: URL
+    let isCurrent: Bool
+
+    init(label: String, url: URL, isCurrent: Bool) {
+        self.id = url.standardizedFileURL.path
+        self.label = label
+        self.url = url
+        self.isCurrent = isCurrent
+    }
+}
+
 @MainActor
 @Observable
 final class WorkspaceViewModel {
@@ -353,6 +367,44 @@ final class WorkspaceViewModel {
         }
 
         navigate(card: &currentCard, to: parentURL)
+        return true
+    }
+
+    func breadcrumbSegments(for card: FolderCard) -> [BreadcrumbSegment] {
+        let currentURL = card.folderURL.standardizedFileURL
+        let currentPath = currentURL.path
+        var segments: [BreadcrumbSegment] = []
+        var url = URL(fileURLWithPath: "/", isDirectory: true)
+
+        segments.append(BreadcrumbSegment(label: "/", url: url, isCurrent: currentPath == "/"))
+
+        for component in currentURL.pathComponents.dropFirst() {
+            url.appendPathComponent(component, isDirectory: true)
+            segments.append(
+                BreadcrumbSegment(
+                    label: component,
+                    url: url,
+                    isCurrent: url.standardizedFileURL.path == currentPath
+                )
+            )
+        }
+
+        return segments
+    }
+
+    @discardableResult
+    func navigate(cardID: UUID, toFolder url: URL) -> Bool {
+        guard var currentCard = workspace.cards.first(where: { $0.id == cardID }),
+              isDirectory(url) else {
+            return false
+        }
+
+        let targetURL = url.standardizedFileURL
+        guard targetURL.path != currentCard.folderURL.standardizedFileURL.path else {
+            return true
+        }
+
+        navigate(card: &currentCard, to: targetURL)
         return true
     }
 

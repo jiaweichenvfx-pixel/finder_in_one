@@ -12,6 +12,7 @@ struct FolderCardView: View {
     let onOpenInFinder: () -> Void
     let onClose: () -> Void
     let onSetColor: (FolderCardColor) -> Void
+    let breadcrumbSegments: [BreadcrumbSegment]
     let selectedItemURLs: Set<URL>
     let suffixFilterText: String
     let sortOrder: FileItemSortOrder
@@ -19,6 +20,7 @@ struct FolderCardView: View {
     let onSelectionChange: (Set<URL>) -> Void
     let onSuffixFilterChange: (String) -> Void
     let onSortOrderChange: (FileItemSortOrder) -> Void
+    let onNavigateToBreadcrumb: (URL) -> Void
     let onDropFiles: ([URL]) -> Bool
     let onOpenItem: (FileItem) -> Void
     let onPreviewItems: ([FileItem], FileItem?) -> Void
@@ -117,10 +119,7 @@ struct FolderCardView: View {
                 .font(card.isCollapsed ? .subheadline : .headline)
                 .lineLimit(1)
             if !card.isCollapsed {
-                Text(card.folderPath)
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.62))
-                    .lineLimit(1)
+                breadcrumbRow
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -134,6 +133,33 @@ struct FolderCardView: View {
         } else {
             content
         }
+    }
+
+    private var breadcrumbRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 3) {
+                ForEach(breadcrumbSegments) { segment in
+                    if segment.id != breadcrumbSegments.first?.id {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.34))
+                    }
+                    Button {
+                        onNavigateToBreadcrumb(segment.url)
+                    } label: {
+                        Text(segment.label)
+                            .font(.system(size: 10, weight: segment.isCurrent ? .semibold : .regular))
+                            .lineLimit(1)
+                            .foregroundStyle(segment.isCurrent ? .white.opacity(0.82) : .white.opacity(0.58))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(segment.isCurrent)
+                    .help(segment.url.path)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(height: 14)
     }
 
     private var fileRows: some View {

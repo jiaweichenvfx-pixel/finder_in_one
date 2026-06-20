@@ -88,6 +88,7 @@ struct WorkspaceView: View {
             onOpenInFinder: { viewModel.openInFinder(card: card) },
             onClose: { viewModel.closeCard(id: card.id) },
             onSetColor: { color in viewModel.setCardColor(color, for: card.id) },
+            breadcrumbSegments: viewModel.breadcrumbSegments(for: card),
             selectedItemURLs: viewModel.selectedItemURLsByCardID[card.id] ?? [],
             suffixFilterText: viewModel.suffixFilterTextByCardID[card.id] ?? "",
             sortOrder: viewModel.sortOrderByCardID[card.id] ?? FileItemSortOrder(column: .name, ascending: true),
@@ -100,6 +101,9 @@ struct WorkspaceView: View {
             },
             onSortOrderChange: { sortOrder in
                 viewModel.setSortOrder(sortOrder, for: card.id)
+            },
+            onNavigateToBreadcrumb: { url in
+                viewModel.navigate(cardID: card.id, toFolder: url)
             },
             onDropFiles: { urls in
                 viewModel.transfer(items: urls.map(fileItem(for:)), to: card)
