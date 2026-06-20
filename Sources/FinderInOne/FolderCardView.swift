@@ -42,9 +42,7 @@ struct FolderCardView: View {
             if !card.isCollapsed {
                 Divider()
                     .overlay(Color.white.opacity(0.18))
-                if isMoving {
-                    dragPlaceholder
-                } else {
+                if dragPresentation.showsFileContent {
                     suffixFilterField
                     if let errorMessage {
                         Text(errorMessage)
@@ -76,6 +74,10 @@ struct FolderCardView: View {
         .onDrop(of: [.fileURL, .url], isTargeted: $isDropTargeted, perform: handleDrop(providers:))
         .offset(moveTranslation)
         .animation(nil, value: moveTranslation)
+    }
+
+    private var dragPresentation: FolderCardDragPresentation {
+        FolderCardDragPresentation(isMoving: isMoving)
     }
 
     private var header: some View {
@@ -191,20 +193,7 @@ struct FolderCardView: View {
             onPreviewItems: onPreviewItems,
             onDropURLs: onDropFiles
         )
-    }
-
-    private var dragPlaceholder: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            ForEach(0..<5, id: \.self) { index in
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.white.opacity(index == 0 ? 0.13 : 0.08))
-                    .frame(height: 10)
-                    .frame(maxWidth: index == 0 ? .infinity : CGFloat(180 + index * 24), alignment: .leading)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.top, 4)
-        .allowsHitTesting(false)
+        .allowsHitTesting(dragPresentation.allowsFileInteraction)
     }
 
     private var suffixFilterField: some View {
@@ -336,6 +325,19 @@ struct FolderCardView: View {
         }
         return true
     }
+}
+
+struct FolderCardDragPresentation {
+    let isMoving: Bool
+
+    var showsFileContent: Bool {
+        true
+    }
+
+    var allowsFileInteraction: Bool {
+        !isMoving
+    }
+
 }
 
 private final class DropURLCollector: @unchecked Sendable {
